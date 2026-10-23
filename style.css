@@ -63,7 +63,8 @@ html, body {
 	height: 100%;
 	font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 	font-size: var(--fs);
-	letter-spacing: 0.001em;
+	/* No letter-spacing, not even a token one: any at all turns off Inter's contextual
+	   alternates, which Figma keeps on — they're what raise the colon in 12:36. */
 	color: var(--chat-text);
 	background: transparent !important;
 	overflow-wrap: break-word;
@@ -88,10 +89,10 @@ html, body {
 }
 #mainContainer.stinger-hidden { opacity: 0; }
 
-/* The receipt: a fixed 596 × 832. (Should it ever change height, only its two
-   straight sides stretch — the zigzag rows, the top and bottom 31px of the art,
-   keep their size.) */
-body.receipt #mainContainer { width: 596px; height: 832px; }
+/* The receipt: a fixed 596 wide, as tall as the source (832 in the settings
+   preview). Only its two straight sides stretch — the zigzag rows, the top and
+   bottom 31px of the art, keep their size. */
+body.receipt #mainContainer { width: 596px; }
 body.receipt #mainContainer::before {
 	content: '';
 	position: absolute;

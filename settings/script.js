@@ -47,8 +47,9 @@ function updateWidget() {
 }
 
 /* Without the receipt the chat box fills the preview area, as it fills its OBS
-   source. The receipt is a fixed 596 × 832: it sits centred at least 14px in from
-   the area's edges, scaled down (never up) when it doesn't fit. */
+   source. The receipt is 596 wide and as tall as its source, shown here at 832: it
+   sits centred at least 14px in from the area's edges, scaled down (never up) when
+   it doesn't fit. */
 const RECEIPT_W = 596, RECEIPT_H = 832, PREVIEW_PAD = 14;
 function fitPreview() {
     const frame = $('widget'), area = $('previewArea');
