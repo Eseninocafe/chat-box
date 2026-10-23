@@ -211,11 +211,12 @@ li.open { overflow: visible; }
 	display: block;
 	height: var(--fs);
 	width: var(--fs);   /* badges are square; sized before they load (see .platform img) */
-	border-radius: 2px;
+	/* The outlined chat badges' shape, everywhere else too (cards, the receipt):
+	   a 2px corner grown by the outline ring, 0.08em = OUTLINE.hrEm in script.js. */
+	border-radius: calc(2px + 0.08 * var(--fs));
 }
-/* Chat badges without the outline (the receipt) take the outlined ones' shape: their
-   2px corner grown by the 1.76px ring (OUTLINE.hrEm × 22px) rounds out to 3.8px. */
-body.receipt #messageContainer #badgeList img { border-radius: 3.8px; }
+/* With the outline on, the ring itself adds the 0.08em. */
+.contrast-outline #messageContainer #badgeList img { border-radius: 2px; }
 
 #timestamp {
 	display: flex;
