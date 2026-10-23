@@ -214,8 +214,8 @@ li.open { overflow: visible; }
 	border-radius: 2px;
 }
 /* Chat badges without the outline (the receipt) take the outlined ones' shape: their
-   2px corner grown by the 1.32px ring (OUTLINE.hrEm × 22px) rounds out to 3.3px. */
-body.receipt #messageContainer #badgeList img { border-radius: 3.3px; }
+   2px corner grown by the 1.76px ring (OUTLINE.hrEm × 22px) rounds out to 3.8px. */
+body.receipt #messageContainer #badgeList img { border-radius: 3.8px; }
 
 #timestamp {
 	display: flex;
