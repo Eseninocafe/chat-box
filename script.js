@@ -356,7 +356,7 @@ function SetConnectionStatus(connected) {
 // nudged slightly darker so it stays visible on the white cards, and a near-black name
 // is nudged slightly lighter so it stays visible over dark footage. Raise/lower these
 // to widen or narrow the "safe" luminance band.
-const USERNAME_LUM_MAX = 0.55;         // names brighter than this get darkened down to it
+const USERNAME_LUM_MAX = 0.30;         // no outline, so on white (receipt, cards): 3:1 against it
 const USERNAME_LUM_MAX_OUTLINE = 0.65; // gentler cap when the outline is on (less darkening)
 const USERNAME_LUM_MIN = 0.04;         // names darker than this get lightened up to it
 const USERNAME_LUM_MIN_OUTLINE = 0.05; // higher floor when the outline is on (a bit lighter)
@@ -390,16 +390,25 @@ function tameUsernameColor(color, maxLum = USERNAME_LUM_MAX, minLum = USERNAME_L
 }
 
 // THE username colour entry point — chat lines, event cards and featured messages all
-// come through here, so a name is the same colour however it reaches the screen. Event
+// come through here (cards by way of usernameCardColor below), so a name is the same
+// colour however it reaches the screen, short of being too light for a card. Event
 // cards used to call tameUsernameColor() bare, which pinned them to the stricter band
 // no matter what, and that is exactly the mismatch this removes.
 function usernameChatColor(color) {
     // With the outline on, the dark stroke supplies the contrast, so bright names
-    // need less darkening and dark names less lightening. Without it, fall back to
-    // the stricter band the overlay used before.
+    // need less darkening and dark names less lightening. Without it (the receipt)
+    // the name is on white paper, so it gets the cards' cap.
     return contrastOutline
         ? tameUsernameColor(color, USERNAME_LUM_MAX_OUTLINE, USERNAME_LUM_MIN_OUTLINE, USERNAME_INK_KEEP)
         : tameUsernameColor(color, USERNAME_LUM_MAX, USERNAME_LUM_MIN);
+}
+
+// Names on the white cards. The band above leans on the outline, which cards don't
+// have, so it left a white name 229 gray on white: next to invisible. A card name is
+// the chat colour, unless it's too light for white — then it's taken down to 3:1.
+function usernameCardColor(color) {
+    const onWhite = tameUsernameColor(color, USERNAME_LUM_MAX, 0);
+    return onWhite === color ? usernameChatColor(color) : onWhite;
 }
 
 // Twitch only puts the chatter's chosen colour on chat messages — event payloads
@@ -562,7 +571,7 @@ async function renderFeaturedMessage(data, headerText, platform) {
 	const featuredColor = platform === 'twitch'
 		? await EventUserColor({ ...data.user, color: data.user?.color || data.message?.color }, 'twitch')
 		: '#FF0000';
-	usernameSpan.replaceWith(usernameMarquee(data.user.name, usernameChatColor(featuredColor)));
+	usernameSpan.replaceWith(usernameMarquee(data.user.name, usernameCardColor(featuredColor)));
 
 	// The template has always had a #badgeList; nothing ever filled it. A featured
 	// message IS a chat message, so its own payload carries the badges.
@@ -645,7 +654,7 @@ async function renderEventCard(data, type, platform, opts = {}) {
 
 	if (showUsername) {
 		usernameDiv.textContent = senderName;
-		usernameDiv.style.color = usernameChatColor(await EventUserColor(data.user, platform, opts.color));
+		usernameDiv.style.color = usernameCardColor(await EventUserColor(data.user, platform, opts.color));
 		if (senderName === 'Anonymous') usernameDiv.classList.add('is-anonymous');
 	}
 
@@ -687,8 +696,8 @@ async function renderEventCard(data, type, platform, opts = {}) {
 
 			// Sender + receiver names become scrolling marquees that split the row's
 			// width by max-min fairness (allocateGiftRow), replacing the old ellipsis.
-			const senderColor = usernameChatColor(await EventUserColor(data.user, platform, opts.color));
-			const receiverColor = usernameChatColor(await EventUserColor(data.recipient, platform, opts.color));
+			const senderColor = usernameCardColor(await EventUserColor(data.user, platform, opts.color));
+			const receiverColor = usernameCardColor(await EventUserColor(data.recipient, platform, opts.color));
 			const senderText = showUsername ? senderName : '';
 
 			// Wrap the sender's avatar · platform · name into one flex cell.
@@ -1017,7 +1026,7 @@ async function renderFollowCard(data, platform, action = 'followed') {
 	const name = data.user?.name || 'Someone';
 
 	if (showUsername) {
-		usernameDiv.replaceWith(usernameMarquee(name, usernameChatColor(await EventUserColor(data.user, platform))));
+		usernameDiv.replaceWith(usernameMarquee(name, usernameCardColor(await EventUserColor(data.user, platform))));
 	}
 
 	if (showPlatform && PLATFORMS_WITH_ICONS.has(platform)) {
