@@ -183,7 +183,7 @@ if (contrastOutline) {
 	      therefore built some other way per shape — never by chaining.               */
 	const OUTLINE = {
 		hrEm:     0.05,   // outline thickness, em
-		depthEm:  0.13,   // 3D extrude depth, em
+		depthEm:  0.1,    // 3D extrude depth, em (whole px: 2 at both sizes)
 		imgScale: 1,      // extrude multiplier for badges / platform icons
 		avScale:  0.9,    // ...and for avatars: a full-bleed disc shows its whole
 		                  //    extrude as one crescent and reads deeper than it measures
