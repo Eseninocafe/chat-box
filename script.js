@@ -336,9 +336,12 @@ const PLATFORMS_WITH_ICONS = new Set(['twitch', 'youtube']);
 
 // The label at the bottom: NOT CONNECTED until Streamer.bot connects, then CONNECTED
 // for a moment before it fades. The settings page's preview has its own "Connected"
-// pill, so there the label is dropped and the state is only handed up.
-const connectionLabel = document.getElementById('connectionLabel');
-if (previewMode) connectionLabel.remove();
+// pill, so there the label is never added and the state is only handed up. Built here
+// rather than in index.html, so a cached old page paired with this script can't crash.
+const connectionLabel = document.createElement('div');
+connectionLabel.id = 'connectionLabel';
+connectionLabel.textContent = 'NOT CONNECTED';
+if (!previewMode) document.body.appendChild(connectionLabel);
 let connectionHideTimer = 0;
 function SetConnectionStatus(connected) {
 	if (window.parent !== window) window.parent.postMessage({ chatbox: connected ? 'connected' : 'disconnected' }, '*');
