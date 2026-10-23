@@ -182,7 +182,7 @@ if (contrastOutline) {
 	      a vertical segment is just a vertical sweep, so it stays exact. Rings are
 	      therefore built some other way per shape — never by chaining.               */
 	const OUTLINE = {
-		hrEm:     0.05,   // outline thickness, em
+		hrEm:     0.06,   // outline thickness, em (1.32px at 22px; the receipt's badge corner follows it)
 		depthEm:  0.1,    // 3D extrude depth, em (whole px: 2 at both sizes)
 		imgScale: 1,      // extrude multiplier for badges / platform icons
 		avScale:  0.9,    // ...and for avatars: a full-bleed disc shows its whole
