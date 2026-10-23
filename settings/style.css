@@ -1,0 +1,336 @@
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+/* Primitives (grays) */
+:root {
+	--black: #000000;
+	--white: #FFFFFF;
+	--gray-100: #ECECEC;
+	--gray-200: #DEDEDE;
+	--gray-800: #3E3E3E;
+	--gray-900: #2A2A2A;
+
+	/* card — the same in both themes */
+	--card-surface: var(--white);
+	--card-stroke: var(--black);
+	--card-text: var(--black);
+}
+
+/* theme=dark (default) — app · button · icon-button */
+:root {
+	--surface: var(--gray-900);
+	--sidebar-bg: var(--black);
+	--text-primary: var(--white);
+	--text-secondary: var(--gray-200);
+	--btn-content: var(--black);
+	--btn-bg: var(--white);
+	--btn-bg-hover: var(--gray-100);
+	--btn-bg-pressed: var(--gray-200);
+	--icon-btn-content: var(--white);
+	--icon-btn-bg-hover: var(--gray-900);
+	--icon-btn-bg-pressed: var(--gray-800);
+}
+
+/* theme=light */
+body.light-mode {
+	--surface: var(--white);
+	--sidebar-bg: var(--white);
+	--text-primary: var(--black);
+	--text-secondary: var(--gray-800);
+	--btn-content: var(--white);
+	--btn-bg: var(--black);
+	--btn-bg-hover: var(--gray-900);
+	--btn-bg-pressed: var(--gray-800);
+	--icon-btn-content: var(--black);
+	--icon-btn-bg-hover: var(--gray-100);
+	--icon-btn-bg-pressed: var(--gray-200);
+}
+
+body {
+	/* macOS font smoothing thickens strokes — a 500 renders like a 600. Off, so the weights match Figma. */
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	font-family: 'Inter', -apple-system, system-ui, sans-serif;
+	background: var(--surface);
+	color: var(--text-primary);
+	height: 100vh;
+	overflow: hidden;
+}
+
+/* The sidebar is a fixed 324px; the preview takes the rest. */
+.app {
+	display: flex;
+	height: 100vh;
+}
+
+.sidebar {
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	width: 324px;
+	background: var(--sidebar-bg);
+}
+
+/* Frame 488 — stays put while the settings scroll under it */
+.sidebar-header {
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 14px;
+}
+
+.app-label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.app-label h1 {
+	font-size: 24px;
+	line-height: 29px;
+	font-weight: 600;
+	text-transform: uppercase;
+}
+
+/* Frame 489 */
+.sidebar-list {
+	flex: 1;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
+	padding: 0 14px 14px;
+}
+
+/* ── icons: mask images painted with currentColor ── */
+.icon {
+	display: block;
+	flex: none;
+	width: 32px;
+	height: 32px;
+	background: currentColor;
+	-webkit-mask: var(--icon) center / contain no-repeat;
+	mask: var(--icon) center / contain no-repeat;
+}
+.icon-copy { --icon: url(../assets/icons/copy.svg); }
+.icon-enter { --icon: url(../assets/icons/enter.svg); }
+.icon-check { --icon: url(../assets/icons/checkmark.svg); }
+.icon-expand { --icon: url(../assets/icons/expand.svg); }
+#themeIcon { --icon: url(../assets/icons/moon.svg); }
+body.light-mode #themeIcon { --icon: url(../assets/icons/sun.svg); }
+
+.icon-btn {
+	flex: none;
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--icon-btn-content);
+	cursor: pointer;
+}
+.icon-btn:hover { background: var(--icon-btn-bg-hover); }
+.icon-btn:active { background: var(--icon-btn-bg-pressed); }
+
+/* button (icon-position=trailing) */
+.btn {
+	flex: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	height: 40px;
+	padding: 4px;
+	border: none;
+	border-radius: 8px;
+	background: var(--btn-bg);
+	color: var(--btn-content);
+	font-family: inherit;
+	font-size: 18px;
+	line-height: 22px;
+	font-weight: 600;
+	cursor: pointer;
+}
+.btn:hover { background: var(--btn-bg-hover); }
+.btn:active { background: var(--btn-bg-pressed); }
+.btn-label { padding-left: 8px; }
+/* "Copied" shows alone, centred */
+.btn.copied .icon { display: none; }
+.btn.copied .btn-label { padding-left: 0; }
+
+/* text-field: the text over an 8px bar */
+.text-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.text-field input,
+.text-field select {
+	width: 100%;
+	height: 22px;
+	padding: 0;
+	border: none;
+	outline: none;
+	background: transparent;
+	font-family: inherit;
+	font-size: 18px;
+	line-height: 22px;
+	font-weight: 500;
+	color: var(--text-primary);
+	text-overflow: ellipsis;   /* a placeholder (or value) too long for the field ends in "…" */
+}
+.text-field input::placeholder { color: var(--text-secondary); opacity: 1; text-overflow: ellipsis; }
+.bar {
+	display: block;
+	height: 8px;
+	border-radius: 4px;
+	background: var(--text-primary);
+}
+
+/* The dropdown: the choice and the expand chevron over the bar */
+/* The select runs under the chevron (its padding keeps the text 8px clear of it),
+   so a click anywhere on the row opens the list. */
+.select-row {
+	position: relative;
+	display: flex;
+	align-items: center;
+}
+.select-row select {
+	flex: 1;
+	min-width: 0;
+	padding-right: 40px;
+	-webkit-appearance: none;
+	appearance: none;
+	cursor: pointer;
+	color: var(--text-secondary);
+}
+.select-row select option { color: initial; }
+/* Frame 465's expand: a 32×22 slot, the 20×10 chevron at its own size in it */
+.select-row .icon {
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 32px;
+	height: 22px;
+	-webkit-mask-size: 32px 32px;
+	mask-size: 32px 32px;
+	pointer-events: none;
+}
+
+/* Frame 475: a field and its Load button, bottoms lined up */
+.load-row {
+	display: flex;
+	align-items: flex-end;
+	gap: 8px;
+}
+.load-row .text-field { flex: 1; min-width: 0; }
+
+/* a group: its heading over its settings */
+.group {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.group-heading {
+	font-size: 18px;
+	line-height: 22px;
+	font-weight: 600;
+	text-transform: uppercase;
+}
+
+/* setting: label (+ description) and a square checkbox */
+.setting[hidden] { display: none; }
+.setting {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 32px;
+}
+.setting-text {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.setting-text label {
+	font-size: 18px;
+	line-height: 14px;
+	font-weight: 600;
+	cursor: pointer;
+}
+/* one line, truncated with an ellipsis; clipped sideways only, since the 14px
+   line is shorter than the glyphs and a full clip would cut their tops off */
+.setting-desc {
+	font-size: 18px;
+	line-height: 14px;
+	font-weight: 500;
+	color: var(--text-secondary);
+	white-space: nowrap;
+	overflow-x: clip;
+	overflow-y: visible;
+	text-overflow: ellipsis;
+}
+.toggle { position: relative; width: 32px; height: 32px; flex: none; cursor: pointer; }
+.toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.toggle-box {
+	position: absolute;
+	inset: 0;
+	border: 2.5px solid var(--text-primary);
+	border-radius: 4px;
+	color: var(--sidebar-bg);   /* the tick, cut out of the filled box */
+}
+.toggle-box .icon { position: absolute; left: -2.5px; top: -2.5px; opacity: 0; }
+.toggle input:checked + .toggle-box { background: var(--text-primary); }
+.toggle input:checked + .toggle-box .icon { opacity: 1; }
+.toggle input:focus-visible + .toggle-box { outline: 2px solid var(--text-secondary); outline-offset: 2px; }
+
+/* ── The preview ── */
+.preview-area {
+	position: relative;
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	background: var(--surface);
+}
+
+/* Without the receipt the chat box fills the area, as it fills its source. With it
+   the receipt sits 14px in, scaled down (never up) when it doesn't fit; script.js
+   sizes and places it. color-scheme stays normal so the chat's transparent page
+   stays see-through over the dark theme. */
+#widget {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+	border: 0;
+	background: transparent;
+	color-scheme: normal;
+	transform-origin: 0 0;
+}
+
+/* "Connected": slides up from the bottom of the preview, then back down */
+.status-pill {
+	position: absolute;
+	left: 50%;
+	bottom: 14px;
+	padding: 4px 8px;
+	border-radius: 6px;
+	background: var(--btn-bg);
+	color: var(--btn-content);
+	font-size: 18px;
+	line-height: 22px;
+	font-weight: 500;
+	white-space: nowrap;
+	transform: translate(-50%, calc(100% + 14px));
+	transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+	pointer-events: none;
+}
+.status-pill.show { transform: translate(-50%, 0); }

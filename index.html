@@ -3,23 +3,25 @@
 
 <head>
 	<meta charset="UTF-8">
-	<meta name="viewport" content="width=502, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Multichat Overlay</title>
 	<link rel="shortcut icon" href="#" />
-	<link rel="preconnect" href="https://fonts.googleapis.com">
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-	<link rel="stylesheet" href="./style.css?v=3" />
+	<!-- The Inter build Figma uses (Google Fonts serves a newer one whose letter widths differ) -->
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@4.5.15/500.css">
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@4.5.15/600.css">
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@4.5.15/700.css">
+	<link rel="stylesheet" href="./style.css?v=7" />
 	<script type="text/javascript" src="https://unpkg.com/@streamerbot/client/dist/streamerbot-client.js"></script>
 </head>
 
 <body>
 
-	<div id="statusContainer">Connecting...</div>
-	
+	<!-- The chat box. With ?receipt=true its ::before is the receipt (assets/receipt.svg);
+	     #chatArea carries the top fade, so the paper itself never fades. -->
 	<div id="mainContainer" class="slide-fade">
-		<ul id="messageList"></ul>
-		<div id="IPutThisHereSoICanCalculateHowBigEachMessageIsSupposedToBeBeforeIAddItToTheMessageList"></div>
+		<div id="chatArea">
+			<ul id="messageList"></ul>
+		</div>
 	</div>
 
 	<template id="messageTemplate">
@@ -27,7 +29,7 @@
 			<div id="userInfo">
 				<span id="avatar"></span>
 				<span id="platform"></span>
-				<span id="username"></span> 
+				<span id="username"></span>
 				<span id="badgeList"></span>
 				<span id="timestamp"></span>
 				<span id="colon-separator" style="display: none;">: </span>
@@ -53,9 +55,7 @@
 			<div class="sub-card-wrapper">
 				<canvas class="sub-border-canvas"></canvas>
 				<div class="sub-card-content">
-					<div class="sub-icon-area">
-						<img src="icons/sub-skull.svg" class="sub-skull-icon" alt="Event Icon">
-					</div>
+					<div class="sub-icon-area"></div>
 					<div class="sub-info">
 						<div class="sub-user-row">
 							<div class="sub-user-content">
@@ -63,7 +63,7 @@
 								<span id="platform"></span>
 								<span id="username"></span>
 								<span id="gift-receiver">
-									<span class="gift-arrow-spacer"><img src="icons/gift-arrow.svg" class="gift-arrow-icon"></span>
+									<span class="gift-arrow-spacer"><img class="gift-arrow-icon" alt=""></span>
 									<span id="receiver-avatar"></span>
 									<span id="receiver-platform"></span>
 									<span id="receiver-username"></span>
@@ -125,7 +125,7 @@
 		</div>
 	</template>
 
-	<script src="./script.js?v=3"></script>
+	<script src="./script.js?v=7"></script>
 </body>
 
 </html>

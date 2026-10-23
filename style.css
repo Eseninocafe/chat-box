@@ -2,101 +2,135 @@
 	margin: 0;
 	padding: 0;
 	box-sizing: border-box;
-	--twitch-purple: #A644FF;
-	--youtube-red: #FF0000;
-	--border-radius: 20px;
+}
 
+/* Tokens. The cards have no dark mode; the drawn outlines read --card-* too. */
+:root {
+	--black: #000000;
+	--white: #FFFFFF;
+	--gray-200: #DEDEDE;
+	--card-surface: var(--white);
+	--card-stroke: var(--black);
+	--card-text: var(--black);
+	--twitch-purple: #9146FF;
+	--youtube-red: #FF0000;
+
+	/* Chat text: white with the contrast outline over the stream, black on the receipt. */
+	--chat-text: var(--white);
+
+	/* size=normal (size=compact below) */
+	--fs: 22px;         --lh: 28px;          /* names, messages, event lines */
+	--fs-time: 20px;    --lh-time: 24px;     /* timestamps */
+	--row: 32px;        --avatar: 32px;      /* user row */
+	--icon-box: 96px;                        /* an event card's icon */
+	--art: 100px;                            /* song card */
+	--title-fs: 32px;   --title-lh: 39px;    --title-box: 36px;
+	--reply-w: 36px;    --reply-h: 28px;
+	--gift-gap: 10px;
+	/* icon boxes, set before the art loads so a scrolling line is measured right */
+	--plat-w: 22px;     --plat-h: 24px;
+	--clock-w: 22px;    --clock-h: 22px;
+	--gift-w: 19px;     --gift-h: 16px;
+
+	/* The chat box's padding: 32px all round over the stream. */
+	--inset: 32px;      --inset-x: 32px;
+}
+
+/* A source 533px wide or less, without the receipt (script.js sets the class). */
+body.compact {
+	--fs: 18px;         --lh: 22px;
+	--fs-time: 16px;    --lh-time: 19px;
+	--row: 28px;        --avatar: 28px;
+	--icon-box: 82px;
+	--art: 80px;
+	--title-fs: 26px;   --title-lh: 31px;    --title-box: 28px;
+	--reply-w: 28px;    --reply-h: 22px;
+	--gift-gap: 8px;
+	--plat-w: 18px;     --plat-h: 18px;
+	--clock-w: 18px;    --clock-h: 19px;
+	--gift-w: 15px;     --gift-h: 13px;
+}
+
+/* On the receipt: black text, and the chat sits 14px inside the paper
+   (4px frame + 4/32px + 14px: 22px at the sides, 50px top and bottom). */
+body.receipt {
+	--chat-text: var(--black);
+	--inset: 50px;      --inset-x: 22px;
 }
 
 html, body {
-	--width: 502px;
-	width: var(--width);
-	min-width: var(--width);
-	max-width: var(--width);
-	font-size: 18px;
+	width: 100%;
+	height: 100%;
 	font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	font-size: var(--fs);
 	letter-spacing: 0.001em;
-	color: var(--font-color, #000000);
+	color: var(--chat-text);
 	background: transparent !important;
 	overflow-wrap: break-word;
 	overflow: hidden;
+	/* macOS font smoothing thickens strokes — a 500 renders like a 600. Off, so the weights match Figma. */
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 }
 
 ::-webkit-scrollbar {
 	display: none;
 }
 
-#statusContainer {
-	font-weight: 500;
-	font-size: 30px;
-	text-align: center;
-	background-color: #D12025;
-	color: white;
-	padding: 10px;
-	border-radius: 10px;
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	transform: translate(-50%, -50%);
-	z-index: 9999;
-}
-
+/* ── The chat box: fills the source; its height is the source's ── */
 #mainContainer {
 	position: relative;
-	background: transparent;
-	padding: 0;
-	width: var(--width);
-	height: 100%;
-	box-sizing: border-box;
+	width: 100%;
+	height: 100vh;
 	/* stinger sync: chat fades out/in around a stinger. Duration must match
 	   STINGER_SYNC.chatFadeMs in script.js. */
 	transition: opacity 350ms ease;
 }
 #mainContainer.stinger-hidden { opacity: 0; }
 
-#mainContainer.show-gradient {
-    -webkit-mask-image: linear-gradient(to bottom,
-        transparent 0px,
-        transparent 11px,
-        black 46px
-    );
-    mask-image: linear-gradient(to bottom,
-        transparent 0px,
-        transparent 11px,
-        black 46px
-    );
+/* The receipt: a fixed 596 × 832. (Should it ever change height, only its two
+   straight sides stretch — the zigzag rows, the top and bottom 31px of the art,
+   keep their size.) */
+body.receipt #mainContainer { width: 596px; height: 832px; }
+body.receipt #mainContainer::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-style: solid;
+	border-width: 31px 8px;
+	border-image: url(assets/receipt.svg?v=2) 31 8 fill / 31px 8px stretch;
+	pointer-events: none;
 }
 
+/* The top fade is on by default, and on the chat only, so the paper never fades. */
+#chatArea {
+	position: absolute;
+	inset: 0;
+	-webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--inset) + 11px), #000 calc(var(--inset) + 46px));
+	mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--inset) + 11px), #000 calc(var(--inset) + 46px));
+}
+
+/* Newest at the bottom, 24px between items. */
 #messageList {
 	list-style: none;
-	background: transparent !important;
+	position: absolute;
+	left: var(--inset-x);
+	right: var(--inset-x);
+	bottom: var(--inset);
 	display: flex;
 	flex-direction: column;
-	width: 100%;
-	position: absolute;
-}
-
-.normalScrollDirection { bottom: 0; }
-.reverseScrollDirection {
-	display: flex;
-	top: 0;
-	flex-direction: column-reverse;
 }
 
 li {
 	list-style: none;
 	overflow: hidden;
 	height: 0;
-	padding: 4px 24px 12px;
-	margin: 0;
-	background: transparent !important;
-	border: none !important;
-	box-shadow: none !important;
-	border-radius: 0 !important;
+	padding-top: 24px;
 	transition: height 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease-out;
 	/* No will-change: a permanent layer hint keeps each line rasterised separately, which softens the text. */
-	width: var(--width);
 }
+/* Open: the outline and its 3D can spill past the line's box again. */
+li.open { overflow: visible; }
 
 /* ── Appear ──────────────────────────────────────────────────────────
    The line's height opens up to make room in the list; the message inside
@@ -132,198 +166,158 @@ li {
 	to   { opacity: 1; transform: translateY(0); }
 }
 
-.reverseLineItemDirection {
-	display: flex;
-	flex-direction: column;
-	justify-content: flex-end;
-}
-
 .slide-fade li { opacity: 0; }
 .slide-fade li.show { opacity: 1; }
 
-#IPutThisHereSoICanCalculateHowBigEachMessageIsSupposedToBeBeforeIAddItToTheMessageList {
-	opacity: 0;
-	padding: 12px 24px;
-	background: transparent !important;
-	box-sizing: border-box;
-	width: var(--width);
-	position: absolute;
-	visibility: hidden;
-}
-
-#messageContainer {
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-	align-items: flex-start;
-	width: 100%;
-	gap: 4px;
-}
-
-#userInfo {
-	display: flex;
-	flex-direction: row;
-	align-items: center;
-	background: transparent !important;
-	width: 100%;
-	height: 32px; 
-}
+/* ── user-row: avatar · platform · name · badges ······ time ── */
+#avatar, #receiver-avatar { display: flex; flex: none; margin-right: 4px; }
+#platform, #receiver-platform { display: flex; flex: none; margin-right: 2px; }
+#avatar:empty, #receiver-avatar:empty, #platform:empty, #receiver-platform:empty, #badgeList:empty { display: none; }
 
 .avatar, #avatar img {
-	display: block; 
-	width: 32px; 
-	height: 32px;
-	border-radius: 100px;
-	flex-shrink: 0;
-}
-
-.platform {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	margin-left: 7px;
-	margin-right: 3px;
-	flex-shrink: 0;
-}
-
-.platform img, img.platform, #platform img {
 	display: block;
-	width: 0.78em;
-	height: 0.94em;
-	object-fit: contain;
+	width: var(--avatar);
+	height: var(--avatar);
+	border-radius: 50%;
+	flex-shrink: 0;
+	object-fit: cover;
 }
 
-.youtube .platform,[data-platform="youtube"] .platform {
-	margin-left: 5px; 
-	margin-right: 2px;
-}
+/* Platform icons are drawn per size: 22×24 normal, 18×18 compact. Sized here rather
+   than left to the art, so the name beside them is measured before it loads. */
+.platform img, img.platform { display: block; width: var(--plat-w); height: var(--plat-h); }
 
-.youtube .platform img, .youtube img.platform, .youtube #platform img,[data-platform="youtube"] .platform img, [data-platform="youtube"] #platform img, img[src*="youtube"] {
-	display: block;
-	width: 0.94em; 
-	height: 0.94em;
-	object-fit: contain;
-}
-
-#username {
+#username, #receiver-username {
 	display: flex;
 	align-items: center;
 	font-weight: 700;
-	font-size: 1em;
-	color: var(--twitch-purple); 
+	font-size: var(--fs);
+	line-height: var(--lh);
+	color: var(--twitch-purple);
 	flex-shrink: 0;
 }
+[data-platform="youtube"] #username { color: var(--youtube-red) !important; }
 
-.youtube #username, [data-platform="youtube"] #username {
-	color: var(--youtube-red) !important;
-}
-
-#receiver-username {
-	display: flex;
-	align-items: center;
-	font-weight: 700;
-	flex-shrink: 0;
-}
-
+/* 8px after the name, 4px between badges */
 #badgeList {
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
-	margin-left: 6px;
+	margin-left: 8px;
 	flex-shrink: 0;
 }
-
 #badgeList img {
 	display: block;
-	height: 1em;
-	width: auto;
+	height: var(--fs);
+	width: var(--fs);   /* badges are square; sized before they load (see .platform img) */
 	border-radius: 2px;
 }
 
 #timestamp {
 	display: flex;
 	align-items: center;
-	font-size: 0.888em;
+	font-size: var(--fs-time);
+	line-height: var(--lh-time);
 	font-weight: 500;
-	color: var(--font-color, #000000) !important;
+	color: var(--chat-text);
 	margin-left: auto;
-	flex-shrink: 0;
-	/* The badge row and the name marquee are both flush against this when the row is
-	   full, so the gap lives here rather than on either of them. */
 	padding-left: 8px;
+	flex-shrink: 0;
+}
+#timestamp:empty { display: none; }
+
+/* ── message-card (a chat line: no card, just the text) ── */
+#messageContainer {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	width: 100%;
+	gap: 4px;
+	padding: 0 14px;
+}
+
+#userInfo {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	width: 100%;
+	height: var(--row);
 	padding-right: 8px;
 }
 
-.sub-event-container #timestamp {
-	color: #000000 !important;
-	font-weight: 500;
-}
-
 #message {
-	font-size: 1em;
+	font-size: var(--fs);
+	line-height: var(--lh);
 	font-weight: 600;
-	line-height: 1.2;
-	color: var(--font-color, #000000);
-	white-space: pre-wrap; 
+	color: var(--chat-text);
+	white-space: pre-wrap;
 	word-wrap: break-word;
 	width: 100%;
 }
 
-#colon-separator {
-	display: none !important;
-}
+#colon-separator { display: none !important; }
 
+/* reply-preview: ↳ name / │ what they said */
 #reply {
 	display: none;
 	flex-direction: column;
-	margin-left: 38px;
-	width: calc(100% - 38px);
-	box-sizing: border-box;
-}
-
-.reply-row {
-	position: relative;
 	width: 100%;
 }
-
-#replyUser {
-	display: block;
-	font-weight: 600;
-	font-size: 1em;
-	line-height: 1.1em;
+.reply-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	height: var(--lh);
 }
-
-#replyMsg {
-	display: block;
-	font-weight: 600;
-	font-size: 1em;
-	line-height: 1.1em;
-	color: var(--font-color, #000000);
+#replyArrow, #replyLine {
+	position: relative;
+	flex: none;
+	width: var(--reply-w);
+	height: var(--reply-h);
+}
+#replyUser {
+	flex: 1;
+	min-width: 0;
+	font-weight: 700;
+	font-size: var(--fs);
+	line-height: var(--lh);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	width: 100%;
+}
+#replyMsg {
+	flex: 1;
+	min-width: 0;
+	font-weight: 600;
+	font-size: var(--fs);
+	line-height: var(--lh);
+	color: var(--chat-text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
-/* Geometry only — the glyph itself is drawn by ::before below. */
-#replyArrow {
+/* Reply arrow + line, drawn by script.js as inline data: SVGs in the chat text's
+   colour (and outlined when the outline is on): a mask from a file vanishes on a
+   file:// browser source. ::before is inset -3px to match their padded viewBox. */
+#messageContainer #replyArrow::before,
+#messageContainer #replyLine::before {
+	content: '';
 	position: absolute;
-	width: 14px;
-	height: 14px;
-	left: -24.5px;
-	top: 1px;
+	inset: -3px;
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: contain;
 }
-
-#replyLine {
-	position: absolute;
-	width: 3px;
-	height: 18px;
-	left: -24.5px;
-}
+#messageContainer #replyArrow::before { background-image: var(--o-reply-arrow); }
+#messageContainer #replyLine::before  { background-image: var(--o-reply-line); }
+body.compact #messageContainer #replyArrow::before { background-image: var(--o-reply-arrow-compact); }
+body.compact #messageContainer #replyLine::before  { background-image: var(--o-reply-line-compact); }
 
 .emote {
 	display: inline-block;
-	height: 1.2em; 
+	height: 1.2em;
 	vertical-align: middle;
 	margin: 0 2px;
 }
@@ -340,17 +334,23 @@ li {
 	vertical-align: middle;
 }
 
-li.sub-card-li {
-	padding: 4px 12px 12px !important;
-	background: transparent !important;
-	overflow: visible !important;
+a {
+	color: #0095ff;
+	text-decoration: none;
+	font-weight: 600;
 }
+
+/* ══ Cards ══════════════════════════════════════════════════════════════════
+   White, with the boiling outline drawn behind on a canvas (script.js). A card
+   with an attachment (a message, a song) stacks it under its header: the header's
+   outline runs 32px on underneath it, as Figma's -32px overlap. */
+li.sub-card-li { overflow: visible; }
 
 .sub-event-container {
 	display: flex;
 	flex-direction: column;
 	width: 100%;
-	gap: 0px; 
+	color: var(--card-text);
 }
 
 .sub-card-wrapper, .sub-comment-wrapper {
@@ -366,273 +366,78 @@ li.sub-card-li {
 	pointer-events: none;
 }
 
+.sub-event-container #timestamp { color: var(--card-text); }
+
+/* event-card: the icon, then the user row over the event line */
 .sub-card-content {
 	position: relative;
 	z-index: 1;
 	display: flex;
 	flex-direction: row;
-	align-items: flex-start;
-	padding: 12px;
-	gap: 12px;
-	border-radius: 20px;
-}
-
-/* Event cards with a comment attached: trim only the bottom so the header
-   sits tighter against the comment below. */
-.sub-card-content.has-comment {
-	padding-bottom: 8px;
+	align-items: center;
 }
 
 .sub-icon-area {
-	width: 57px;
-	height: 57px;
-	flex-shrink: 0;
+	flex: none;
+	width: var(--icon-box);
+	height: var(--icon-box);
 }
-
-.sub-skull-icon {
-	position: absolute;
-	width: 69px;
-	height: 66px;
-	left: 10px;
-	top: 10px;
-	object-fit: contain;
-	z-index: 2;
-	pointer-events: none;
-}
-
-.sub-comment-content {
-	position: relative;
-	z-index: 1;
-	padding: 12px;
-	border-radius: 20px;
-	font-weight: 600;
-	line-height: 1.2;
-	color: #000000;
-	min-height: 40px;
-}
-
-/* Song-request cards get a touch more right breathing room (16px vs the default 12px)
-   so the album-art / marquee sit less tight against the card edge. Class is added in
-   renderEventCard when the comment holds a song card. */
-.sub-comment-content.is-song-request {
-	padding-right: 16px;
-}
-
-.sub-raid-icon {
-	position: absolute;
-	width: 68px;
-	height: 58px;
-	left: 8.5px;
-	top: 12px;
-	object-fit: contain;
-	z-index: 2;
-	pointer-events: none;
-}
-
-.sub-calendar-icon {
-	width: 18px;
-	height: 17px;
-	display: inline-block;
-	margin-left: 3px;
-	margin-right: -2px;
-	vertical-align: middle;
-	position: relative;
-	top: -2.5px; 
-}
-
-.sub-donation-icon {
-	position: absolute;
-	width: 65px;
-	height: 63px;
-	left: 12px;
-	top: 12px;
-	object-fit: contain;
-	z-index: 2;
-	pointer-events: none;
-}
-
-/* Tier-colored bit-jar icon on cheer cards (bit-jar-gray/purple/green/blue/red.svg).
-   Pinned to the alert container's top-left corner at native SVG size. */
-.sub-bit-jar-icon {
-	position: absolute;
-	width: 81px;
-	height: 81px;
-	left: 0;
-	top: 0;
-	object-fit: contain;
-	z-index: 2;
-	pointer-events: none;
-}
-
-/* New event-type icons (placeholders - replace the SVGs in /icons to rebrand) */
-.sub-follow-icon,
-.sub-cheer-icon,
-.sub-channelpoint-icon,
-.sub-watchstreak-icon {
-	position: absolute;
-	width: 60px;
-	height: 60px;
-	left: 10px;
-	top: 11px;
-	object-fit: contain;
-	z-index: 2;
-	pointer-events: none;
-}
-
-/* Small inline icon used inside a description (channel-point / bit cost).
-   brightness(0) renders it as a solid black silhouette so it stays visible
-   on the white card and matches the black line-art look. */
-.sub-inline-icon {
-	height: 0.9em;
-	width: auto;
-	vertical-align: -0.12em;
-	margin: 0 2px;
-	filter: brightness(0);
-}
-
-.sub-inline-icon.bit-icon {
-	filter: none;
-}
-
-/* Tier-colored bit gem inside the cheer description ("Cheered 100 <gem>").
-   22px tall to match the description's text box; width stays auto so the
-   narrower purple gem keeps its aspect. 1px gap to the text on its left. */
-.sub-bit-gem-icon {
-	height: 22px;
-	width: auto;
-	margin-left: 1px;
-	/* Gem box (22px) and the text's line box (~22px) are the same height, so
-	   top-aligning them = zero vertical offset, matching Figma. `middle` would
-	   center on the x-height and sit the gem visibly low. */
-	vertical-align: top;
-}
-
-/* ===== Follow alert (single centered row inside the boiling border) ===== */
-.follow-card-content {
-	align-items: center;
-	gap: 0;
-}
-.follow-card-content #username {
-	display: block;
-	font-weight: 700;
-	flex-shrink: 1;
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.follow-card-content .follow-action {
-	font-weight: 600;
-	color: #000000;
-	margin-left: 4px;
-	margin-right: 3px;   /* 3px gap to the timestamp, matching the other cards */
-	flex-shrink: 0;
-}
-
-.featured-header-content {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	padding: 12px;
-}
-
-.featured-header-text {
-	font-size: 1.11em;
-	font-weight: 600;
-	text-transform: uppercase;
-	color: #000000;
-}
-
-.featured-message-content {
-	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
-	padding: 12px;
-	gap: 3px;
-}
-
-.featured-message-text {
-	font-size: 1em;
-	font-weight: 600;
-	line-height: 1.2;
-	color: #000000;
-	word-wrap: break-word;
-	white-space: pre-wrap; 
-	width: 100%;
-}
-
-a {
-    color: #0095ff;
-    text-decoration: none;
-    font-weight: 600;
-}
-
-.featured-message-text a {
-	color: #0095ff;
-	text-decoration: none;
-	font-weight: 600;
-}
+.sub-icon-area img { display: block; }
 
 .sub-info {
 	display: flex;
 	flex-direction: column;
-	align-items: flex-start;
-
-	flex-grow: 1;
+	gap: 4px;
+	flex: 1;
 	min-width: 0;
+	padding: 14px 14px 14px 0;
 }
-
-/* Cards with an icon image restore the 3px gap between the username row and the
-   description ("Subscribed With Tier 1", etc.). Icon-less cards (cheer, power-up,
-   channel point, watch streak) remove .sub-icon-area, so they stay tight. */
-.sub-card-content:has(.sub-icon-area) .sub-info {
-	gap: 3px;
-}
+/* channel-point-card (and the watch streak): no icon, 12 × 14 inside */
+.sub-card-content:not(:has(.sub-icon-area)) .sub-info { padding: 12px 14px; }
 
 .sub-user-row {
 	display: flex;
 	flex-direction: row;
 	align-items: center;
 	width: 100%;
-	height: 32px;
+	height: var(--row);
+	padding-right: 8px;
 }
 
 .sub-user-content {
 	display: flex;
 	flex-direction: row;
 	align-items: center;
-	min-width: 0;
-	overflow: visible;
-	/* Fill the row up to a fixed 3px gap before the timestamp, so the scrolling
-	   username window ends exactly 3px from it — never a larger gap. */
 	flex: 1 1 auto;
-	margin-right: 6px;
+	min-width: 0;
 }
 
-.sub-user-content #username {
-    display: block;
-    flex-shrink: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.sub-user-content:has(#gift-receiver[style*="display: flex"]) #username,
-.sub-user-content:has(#gift-receiver[style*="display: block"]) #username {
-    max-width: 120px;
-}
-
-.sub-user-content #receiver-username {
+/* event-description: "Cheered 100 💎", "⦿ 300", "📅 14 Months" — groups 8px apart,
+   in a fade-scroll window (.desc-mq) that scrolls like a username when it's clipped */
+.sub-description {
 	display: block;
-	flex: 1;
-	min-width: 30px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	min-width: 0;
+	font-weight: 600;
+	font-size: var(--fs);
+	line-height: var(--lh);
 }
+.desc-mq { width: 100%; }
+.desc-mq .mq-inner {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+/* Compact channel-point card: just the user row ("Redeemed …  ⦿ 300" goes). */
+body.compact .sub-event-container[data-type="channelpoint"] .sub-description { display: none; }
+.ev-group {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	flex: none;
+}
+.ev-group img { display: block; flex: none; }
 
+/* gift row: sender ▸ receiver */
 #gift-receiver {
 	display: none;
 	align-items: center;
@@ -643,49 +448,138 @@ a {
 	   so the right edge rendered as a hard clip instead of the fade. */
 	overflow: visible;
 }
-
 .gift-arrow-spacer {
 	display: flex;
 	align-items: center;
-	margin-left: 3px;
-	margin-right: 3px;
+	flex-shrink: 0;
+	margin: 0 var(--gift-gap);
+}
+.gift-arrow-icon { display: block; width: var(--gift-w); height: var(--gift-h); }
+
+/* attached-message / the song card */
+.sub-comment-content {
+	position: relative;
+	z-index: 1;
+	padding: 14px;
+	font-weight: 600;
+	font-size: var(--fs);
+	line-height: var(--lh);
+	color: var(--card-text);
+}
+
+/* message-header (announcement, first-time chat) over its message card */
+.featured-header-content {
+	justify-content: space-between;
+	padding: 12px 22px 12px 14px;
+	gap: 8px;
+}
+.featured-header-text {
+	flex: 1;
+	min-width: 0;
+	font-weight: 600;
+	font-size: var(--fs);
+	line-height: var(--lh);
+	text-transform: uppercase;
+}
+.featured-message-content {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 4px;
+}
+.featured-message-content .sub-user-row { padding-right: 0; }
+.featured-message-text {
+	font-weight: 600;
+	font-size: var(--fs);
+	line-height: var(--lh);
+	word-wrap: break-word;
+	white-space: pre-wrap;
+	width: 100%;
+}
+
+/* notice-card: "Username followed" ······ time */
+.follow-card-content {
+	align-items: center;
+	min-height: calc(var(--row) + 24px);
+	padding: 12px 22px 12px 14px;
+}
+.follow-card-content .follow-action {
+	flex: none;
+	margin-left: 8px;
+	font-weight: 600;
+	font-size: var(--fs);
+	line-height: var(--lh);
+}
+
+/* song-info-card */
+.music-ui-container {
+	display: flex;
+	flex-direction: row;
+	align-items: flex-start;
+	gap: 12px;
+	width: 100%;
+	color: var(--card-text);
+}
+.music-ui-art {
+	display: block;
+	width: var(--art);
+	height: var(--art);
+	border-radius: 12px;
+	object-fit: cover;
 	flex-shrink: 0;
 }
-
-.gift-arrow-icon {
-	width: 17px;
-	height: auto;
-	display: block;
-	flex-shrink: 0;        
+.music-ui-info {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	flex: 1;
+	min-width: 0;
+	padding-right: 4px;
 }
-
-.sub-description {
+/* Figma's title sits in a 36px (28px) row with its full 39px (31px) line; the
+   margins take the difference back so the row is the right height. */
+.music-ui-title {
 	font-weight: 600;
-	line-height: 1.2;
-	color: #000000;
-	width: 100%;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	padding: 0px 0; /* 4px */
-	margin: 0px 0;
+	font-size: var(--title-fs);
+	line-height: var(--title-lh);
+	margin: calc((var(--title-box) - var(--title-lh)) / 2) 0;
 }
+.music-ui-album {
+	font-weight: 500;
+	font-size: var(--fs);
+	line-height: var(--lh);
+}
+.music-ui-artist-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	font-weight: 500;
+	font-size: var(--fs);
+	line-height: var(--lh);
+	white-space: nowrap;
+}
+.music-ui-artist { flex: 0 1 auto; min-width: 0; }
+.music-ui-duration {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex-shrink: 0;
+}
+.music-ui-clock { display: block; width: var(--clock-w); height: var(--clock-h); }
 
 /* ══ Contrast outline + 3D extrude ═══════════════════════════════════════════
-   Behind ?contrastOutline — without it the overlay renders exactly as it did
-   before: black text, no ring, no extrude, and none of the JS in script.js runs.
-   Also scoped to
-   #messageContainer, so the bordered cards, which have their own solid white
-   backgrounds, are untouched.
+   On whenever the receipt is off (the chat is over the stream), and on chat lines
+   only: the cards have their own solid backgrounds and are untouched.
 
    Values and the JS half live in script.js under OUTLINE / the --o-* custom
    properties; the long note there explains why the extrude is built from 1px
-   passes and why the icons use a mask union rather than a filter. */
+   passes and why the icons use a filter. */
 
 /* Registered so it inherits as a COMPUTED length. An unregistered custom property
    is substituted as raw tokens and would re-resolve against each element's own
-   font-size, which made the outline thinner on #timestamp (0.888em) than on
-   #message — one number has to mean one thickness everywhere. */
+   font-size, which made the outline thinner on #timestamp than on #message — one
+   number has to mean one thickness everywhere. */
 @property --o-hr { syntax: '<length>'; inherits: true; initial-value: 0.9px; }
 
 .contrast-outline #messageContainer #message,
@@ -701,14 +595,8 @@ a {
 	filter: var(--o-text-extrude, none);
 }
 
-/* No colour overrides here on purpose. #message, #replyMsg and #timestamp already
-   read var(--font-color), and script.js defaults that to white whenever the outline
-   is on — so the default look is white-on-dark-outline, while an explicit
-   ?fontColor= still works. Hardcoding #ffffff here silently broke that param. */
-
 /* The username outline targets .name-mq .mq-inner, not #username: usernameMarquee()
-   replaces the #username span with <div class="mq fade name-mq">, so the old rule
-   never matched on a chat message and usernames went un-outlined entirely.
+   replaces the #username span with <div class="mq fade name-mq">.
 
    .mq's box hugs the name with zero slack and has overflow-x:clip, so the outline
    was sliced off the first and last letter. Padding is the fix rather than
@@ -718,15 +606,11 @@ a {
    is sized to — giving descenders room below the baseline. Negative margins keep the
    name exactly where it was.
 
-   The HORIZONTAL padding is kept to barely over the ring radius, and that matters for
-   two reasons beyond the outline. The negative margin pulls the neighbours in over
-   this padding, so every extra pixel of it is a pixel the scrolling name is allowed
-   to paint on top of the platform icon and the badges. And the fade mask is sized to
-   the border box while MQ.fadePx is a fixed 8px, so a padding wider than 8px puts the
-   whole fade band inside the padding — hidden under those same neighbours, leaving a
-   hard cut where the fade should be. It was 0.62em (~11px), which did both.
-   Vertical stays generous: nothing sits beside the name there, and descenders plus
-   the downward extrude need the room. */
+   The HORIZONTAL padding is kept to barely over the ring radius: the negative margin
+   pulls the neighbours in over this padding, and the fade mask is sized to the
+   border box while MQ.fadePx is a fixed 8px, so a padding wider than 8px would hide
+   the whole fade band under those same neighbours. Vertical stays generous: nothing
+   sits beside the name there, and descenders plus the downward extrude need it. */
 .contrast-outline #messageContainer .mq {
 	padding: 0.5em calc(var(--o-hr) + 1px);
 	margin: -0.5em calc((var(--o-hr) + 1px) * -1);
@@ -734,35 +618,13 @@ a {
 
 /* #replyMsg is overflow:hidden on both axes (needed for text-overflow:ellipsis) with
    no padding, so the clip box sat exactly on the text and cut the outline off the
-   first letter. Same padding trick, box widened so the text does not move.
-   Deliberately NO line-height change: raising it grows #replyUser and pushes the row
-   down, while #replyArrow is absolutely positioned and stays put. */
+   first letter. Same padding trick, box widened so the text does not move. */
 .contrast-outline #messageContainer #replyMsg {
-	padding-left: 0.62em;
-	margin-left: -0.62em;
-	width: calc(100% + 0.62em);
-	padding-bottom: 0.4em;
-	margin-bottom: -0.4em;
+	padding: 0 0 0.4em 0.62em;
+	margin: 0 0 -0.4em -0.62em;
 }
 
-/* Reply arrow + line — applied in BOTH modes, see the note in script.js.
-   style.css masks these with url(icons/reply-*.svg), and on a file:// browser source
-   Chrome treats that as cross-origin: the mask computes to transparent and both
-   glyphs vanish. An inline data: SVG (generated in script.js so it follows
-   ?fontColor=) has no origin to fail, and doubles as the outline when one is on. */
-#messageContainer #replyArrow::before,
-#messageContainer #replyLine::before {
-	content: '';
-	position: absolute;
-	inset: -3px;                 /* matches the padded viewBox in the data URI */
-	background-repeat: no-repeat;
-	background-position: center;
-	background-size: contain;
-}
-#messageContainer #replyArrow::before { background-image: var(--o-reply-arrow); }
-#messageContainer #replyLine::before  { background-image: var(--o-reply-line); }
-
-/* Only the 3D is outline-only; the glyphs themselves exist either way. */
+/* Only the 3D is outline-only; the reply glyphs themselves exist either way. */
 .contrast-outline #messageContainer #replyArrow,
 .contrast-outline #messageContainer #replyLine {
 	filter: var(--o-text-extrude, none);
@@ -782,106 +644,10 @@ a {
 	box-shadow: var(--o-avatar-shadow, none);
 }
 
-/* --font-color is white whenever the outline is on, so pin the cards back to black
-   (left unscoped on purpose, so it also protects a manual ?fontColor=#ffffff): several card descendants (.sub-card-content, .sub-user-row, .bits,
-   the music UI, #receiver-username) inherit their colour rather than setting it, and
-   would otherwise render white on a white card. */
-.sub-event-container,
-.music-ui-container {
-	color: #000000;
-}
-
-/* ===== Music Info UI (Song Request) ===== */
-.music-ui-container {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.music-ui-art {
-    width: 76px;
-    height: 76px;
-    border-radius: 10px;
-    object-fit: cover;
-    flex-shrink: 0;
-}
-
-.music-ui-info {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 2px;
-    flex: 1;
-    min-width: 0; /* Critical for text truncation */
-}
-
-.music-ui-title {
-    font-size: 24px;
-    font-weight: 600;
-    color: #000000;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.1;
-    /* The marquee fade mask clips to the border box; this tight line-height lets glyph
-       descenders (g, y, j) ink just past the box bottom, so they'd get sheared off when
-       the title overflows and the mask kicks in. padding-block gives the box a few px of
-       vertical room to contain that ink; the negative margin-block cancels it so the
-       card's spacing is unchanged. (Vertical only — the horizontal edge fade is untouched.) */
-    padding-block: 4px;
-    margin-block: -4px;
-}
-
-.music-ui-album {
-    font-size: 18px;
-    font-weight: 500;
-    color: #000000;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.2;
-}
-
-.music-ui-artist-row {
-    display: flex;
-    align-items: center;
-    font-size: 18px;
-    font-weight: 500;
-    color: #000000;
-    white-space: nowrap;
-    overflow: hidden;
-    gap: 8px;
-}
-
-.music-ui-artist {
-    text-overflow: ellipsis;
-    overflow: hidden;
-    white-space: nowrap;
-    flex-shrink: 1;
-    min-width: 0;
-}
-
-.music-ui-duration {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-shrink: 0;
-}
-
-.music-ui-clock {
-    width: 18px;
-    height: 18px;
-    object-fit: contain;
-}
-
 /* ═══════════════════════════════════════════════════════════════════
    Scrolling marquee windows (ported from MusicUIRender/app.js). These replace the
-   old "…" text-overflow: ellipsis treatment on gift-sub names and on the
-   song-request song info. Defined last so .mq's overflow wins over the
-   ellipsis rules on .music-ui-title / .music-ui-album / .music-ui-artist.
+   old "…" text-overflow: ellipsis treatment on names and on the song-request song
+   info. Defined last so .mq's overflow wins over any ellipsis rules above.
    ═══════════════════════════════════════════════════════════════════ */
 .mq { overflow-x: clip; overflow-y: visible; }
 .mq-inner { display: inline-block; vertical-align: top; white-space: nowrap; }
@@ -893,28 +659,30 @@ a {
 
 /* Username fade-scroll window: replaces the old "…" ellipsis truncation. Shrinks
    within its flex row so it only scrolls when the name would overflow. */
-.name-mq { font-weight: 700; font-size: 1em; flex-shrink: 1; min-width: 0; }
+.name-mq {
+	font-weight: 700;
+	font-size: var(--fs);
+	line-height: var(--lh);
+	flex-shrink: 1;
+	min-width: 0;
+}
 
 /* ── Gift-sub two-name row (sender name ↔ receiver name share the width) ── */
-/* fill + 3px timestamp gap come from the base .sub-user-content rule above. */
 .sub-user-content.is-gift #gift-receiver {
-    flex: 1 1 0;
-    min-width: 0;
+	flex: 1 1 0;
+	min-width: 0;
 }
-
 .gift-sender {
-    display: flex;
-    align-items: center;
-    flex: 1 1 0;
-    min-width: 0;
+	display: flex;
+	align-items: center;
+	flex: 1 1 0;
+	min-width: 0;
 }
-
 .gift-name {
-    font-weight: 700;
-    font-size: 1em;
-    flex: 1 1 0;
-    min-width: 0;
+	font-weight: 700;
+	font-size: var(--fs);
+	line-height: var(--lh);
+	flex: 1 1 0;
+	min-width: 0;
 }
-/* Cards sit on solid white, so macOS would thicken their text while
-   chat (on transparency) can't be. Turn that off so card and chat text weigh the same. */
-.sub-event-container { -webkit-font-smoothing: antialiased; }
+.sub-comment-text { display: block; }

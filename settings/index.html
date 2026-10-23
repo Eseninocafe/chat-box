@@ -2,187 +2,46 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings</title>
-    <style>
-        body {
-            margin: 0;
-            background: #181818;
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-            position: relative;
-        }
-
-        #settings-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            height: calc(100vh / 1.5);
-            border: none;
-            background: #1e1e1e;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            transform: scale(1.5);
-            transform-origin: top left;
-            width: 26.666vw;
-            min-width: 26.666vw;
-        }
-
-        #settings-header {
-            padding: 16px;
-            border-bottom: 1px solid #2e2e2e;
-            flex-shrink: 0;
-        }
-
-        #copy-btn {
-            width: 100%;
-            padding: 10px;
-            background: #7c5cfc;
-            color: #fff;
-            border: none;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        #copy-btn:hover { background: #9170ff; }
-        #copy-btn.copied { background: #3ecf8e; }
-
-        #load-row { display: flex; gap: 6px; margin-top: 8px; }
-        #load-url-input {
-            flex: 1;
-            width: auto;
-            min-width: 0;
-            background: #111;
-            border: 1px solid #333;
-            border-radius: 6px;
-            color: #e0e0e0;
-            font-size: 12px;
-            font-family: sans-serif;
-            padding: 8px;
-            outline: none;
-        }
-        #load-url-input:focus { border-color: #7c5cfc; }
-        #load-btn {
-            padding: 8px 14px;
-            background: #2e2e2e;
-            color: #fff;
-            border: 1px solid #444;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            flex-shrink: 0;
-        }
-        #load-btn:hover { background: #3a3a3a; }
-        #load-btn.loaded { background: #3ecf8e; border-color: #3ecf8e; }
-        #load-btn.error { background: #cf3e3e; border-color: #cf3e3e; }
-
-        #settings-scroll {
-            overflow-y: auto;
-            flex: 1;
-            padding: 8px 0 20px;
-        }
-
-        .group-label {
-            font-family: sans-serif;
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            color: #9b7dff;
-            padding: 16px 16px 6px;
-        }
-
-        .setting-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 16px;
-            gap: 12px;
-            font-family: sans-serif;
-        }
-        .setting-row:hover { background: #ffffff08; }
-
-        .setting-label { font-size: 13px; color: #e0e0e0; }
-        .setting-desc { font-size: 11px; color: #666; margin-top: 2px; }
-
-        input[type="text"], input[type="number"], select {
-            background: #111;
-            border: 1px solid #333;
-            border-radius: 5px;
-            color: #e0e0e0;
-            font-size: 12px;
-            padding: 5px 8px;
-            outline: none;
-        }
-        input[type="text"] { width: 130px; }
-        input[type="number"] { width: 65px; }
-        select { width: 150px; cursor: pointer; }
-        input[type="color"] {
-            width: 36px; height: 28px;
-            border: 1px solid #333;
-            border-radius: 5px;
-            background: none;
-            cursor: pointer;
-            padding: 2px;
-        }
-
-        .toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
-        .toggle input { opacity: 0; width: 0; height: 0; }
-        .toggle-track {
-            position: absolute; inset: 0;
-            background: #333; border-radius: 999px; cursor: pointer;
-            transition: background 0.2s;
-        }
-        .toggle input:checked + .toggle-track { background: #7c5cfc; }
-        .toggle-thumb {
-            position: absolute; top: 3px; left: 3px;
-            width: 14px; height: 14px;
-            background: #fff; border-radius: 50%;
-            transition: transform 0.2s; pointer-events: none;
-        }
-        .toggle input:checked ~ .toggle-thumb { transform: translateX(16px); }
-
-        #widget-container {
-            position: absolute;
-            left: 40vw;
-            width: 60vw;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        iframe#widget {
-            height: 100%;
-            border: none;
-        }
-    </style>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Chat Box</title>
+	<link rel="shortcut icon" href="#" />
+	<!-- The Inter build Figma uses (Google Fonts serves a newer one whose letter widths differ) -->
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@4.5.15/500.css">
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@4.5.15/600.css">
+	<link rel="stylesheet" href="./style.css">
 </head>
 
 <body>
+	<!-- before first paint, so a saved light theme doesn't flash dark -->
+	<script>try { if (localStorage.getItem('theme') === 'light') document.body.classList.add('light-mode'); } catch (e) {}</script>
 
-    <div id="settings-container">
-        <div id="settings-header">
-            <button id="copy-btn" onclick="copyUrl()">Copy Widget URL</button>
-            <div id="load-row">
-                <input type="text" id="load-url-input" placeholder="Paste a widget URL to load its settings">
-                <button id="load-btn" onclick="loadFromUrlInput()">Load</button>
-            </div>
-        </div>
-        <div id="settings-scroll"></div>
-    </div>
+	<div class="app">
+		<aside class="sidebar">
+			<div class="sidebar-header">
+				<div class="app-label">
+					<h1>Chat Box</h1>
+					<button id="themeToggle" class="icon-btn" type="button" title="Toggle theme" aria-label="Toggle theme">
+						<span id="themeIcon" class="icon"></span>
+					</button>
+				</div>
+				<button id="copyBtn" class="btn" type="button"><span id="copyLabel" class="btn-label">Copy Widget URL</span><span class="icon icon-copy"></span></button>
+				<div class="load-row">
+					<label class="text-field"><input id="loadInput" type="text" placeholder="Paste widget URL" spellcheck="false" autocomplete="off"><span class="bar"></span></label>
+					<button id="loadBtn" class="btn" type="button"><span class="btn-label">Load</span><span class="icon icon-enter"></span></button>
+				</div>
+			</div>
+			<div id="settingsList" class="sidebar-list"></div>
+		</aside>
 
-    <div id="widget-container">
-        <iframe id="widget"></iframe>
-    </div>
+		<!-- The chat box itself, with these settings: what Streamer.bot sends, or a demo chat -->
+		<main id="previewArea" class="preview-area">
+			<iframe id="widget" title="Chat box preview"></iframe>
+			<div id="statusPill" class="status-pill">Connected</div>
+		</main>
+	</div>
 
-    <script src="script.js"></script>
-
+	<script src="script.js"></script>
 </body>
 
 </html>

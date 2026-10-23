@@ -41,7 +41,8 @@ assert.strictEqual(BitTierColor(LookupTwitchBits('idA')), 'red', '10000 via the 
 assert.strictEqual(LookupTwitchBits(null, undefined, ''), 0, 'no keys -> no badge');
 
 // the official-bits-badge filter: drops Twitch's gem, keeps everything else
-eval(grab(/function IsTwitchBitsBadge[\s\S]*?\n}/, 'IsTwitchBitsBadge'));
+eval(grab(/function BadgeIs[\s\S]*?\n}/, 'BadgeIs'));
+const IsTwitchBitsBadge = b => BadgeIs(b, 'bits');
 for (const b of [{name:'bits', version:'10000', imageUrl:'x'}, {setId:'Bits'}, {name:'BITS'}])
   assert.strictEqual(IsTwitchBitsBadge(b), true, 'should drop ' + JSON.stringify(b));
 for (const b of [{name:'moderator'}, {name:'bits-leader'}, {name:'subscriber', version:'bits2'},
@@ -60,6 +61,10 @@ assert.deepStrictEqual(LookupTwitchBadges('nobody'), [], 'unknown user -> no bad
 assert.deepStrictEqual(LookupTwitchBadges(null, undefined, ''), [], 'no keys -> no badges');
 RememberTwitchBadges([], 'x'); RememberTwitchBadges(null, 'x');
 assert.deepStrictEqual(LookupTwitchBadges('x'), [], 'empty payload is not remembered');
+
+// the broadcaster swap matches the same way, and nothing else is mistaken for it
+assert.strictEqual(BadgeIs({name:'broadcaster', imageUrl:'x'}, 'broadcaster'), true);
+assert.strictEqual(BadgeIs({name:'moderator', imageUrl:'broadcaster.png'}, 'broadcaster'), false);
 
 // one colour pipeline: chat lines, event cards and featured messages all resolve a
 // username through usernameChatColor, so the same name is the same colour everywhere.

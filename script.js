@@ -2,43 +2,53 @@ const dpr = window.devicePixelRatio || 1;
 const queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
 
+// Streamer.bot's websocket. It has no setting any more; an address or port from an
+// older URL is still honoured, so existing browser sources keep connecting.
 const sbServerAddress = urlParams.get("address") || "127.0.0.1";
 const sbServerPort = urlParams.get("port") || "8080";
 
-const BASE_WIDTH = GetIntParam("width") || 502;
-const TARGET_WIDTH_PARAM = GetIntParam("targetWidth");
+/* ── Layout ─────────────────────────────────────────────────────────────────
+   Nothing scales: the chat is drawn at its design size and laid out to fill the
+   browser source. With ?receipt=true it sits on the receipt, which is its
+   background: a fixed 596px wide, black text, no contrast outline. Without it the
+   background is transparent, the text is white with the outline, there's 32px
+   clear all round, and a source 533px wide or less gets the compact sizes.
+   ?preview is the settings page's preview (never in a copied URL). */
+const receipt = GetBooleanParam("receipt", false);
+const previewMode = urlParams.has("preview");
+const contrastOutline = !receipt;
+const COMPACT_MAX_W = 533;
+let compact = !receipt && window.innerWidth <= COMPACT_MAX_W;
+document.body.classList.toggle('receipt', receipt);
+document.body.classList.toggle('compact', compact);
+if (contrastOutline) document.body.classList.add('contrast-outline');
 
-document.documentElement.style.setProperty('--width', `${BASE_WIDTH}px`);
-document.body.style.width = `${BASE_WIDTH}px`;
-// Scale with `zoom`, not transform: scale(). zoom lays the text out at its final pixel
-// size so it stays sharp; a transform rasterises small and stretches, which OBS shows
-// as pixelated. By default the chat fills the browser source's width, so set the size
-// in the source's Width/Height. For the smoothest edges, make the source 2x the size
-// you want and scale it to 0.5 in the scene (Bicubic/Lanczos), so OBS supersamples it.
-// Any extra `zoom` from OBS's custom CSS is folded in too.
-let cssZoom = 1;   // total zoom; also read by the canvas borders so they draw at screen size
-function FitToSource() {
-	const target = TARGET_WIDTH_PARAM || window.innerWidth || 648;
-	document.documentElement.style.zoom = target / BASE_WIDTH;
-	cssZoom = (parseFloat(getComputedStyle(document.documentElement).zoom) || 1) * (parseFloat(getComputedStyle(document.body).zoom) || 1);
-	document.body.style.height = `${window.innerHeight / cssZoom}px`;
+// Per-size artwork: assets/icons/normal and /compact (the compact ones are redrawn,
+// not scaled). Icons carry data-icon, so a source resized across the breakpoint
+// swaps them in place.
+const iconSrc = (name) => `assets/icons/${compact ? 'compact' : 'normal'}/${name}.svg`;
+const iconImg = (name, cls = '') => `<img src="${iconSrc(name)}" data-icon="${name}" class="${cls}">`;
+function ApplyCompact() {
+	const c = !receipt && window.innerWidth <= COMPACT_MAX_W;
+	if (c === compact) return;
+	compact = c;
+	document.body.classList.toggle('compact', compact);
+	document.querySelectorAll('img[data-icon]').forEach(img => { img.src = iconSrc(img.dataset.icon); });
 }
-FitToSource();
-window.addEventListener('load', FitToSource);
-window.addEventListener('resize', FitToSource);
-new MutationObserver(FitToSource).observe(document.head, { childList: true, subtree: true, characterData: true });
+window.addEventListener('resize', ApplyCompact);
+// A resized source reflows every line, so a title or name that fitted may now be
+// clipped (or the other way round): measure the scrolling windows again once it settles.
+let remeasureTimer = 0;
+window.addEventListener('resize', () => {
+	clearTimeout(remeasureTimer);
+	remeasureTimer = setTimeout(() => document.querySelectorAll('#messageList li.show').forEach(startCardMarquees), 150);
+});
 
 const showPlatform = GetBooleanParam("showPlatform", true);
 const showAvatar = GetBooleanParam("showAvatar", true);
 const showTimestamps = GetBooleanParam("showTimestamps", true);
 const showBadges = GetBooleanParam("showBadges", true);
 const showUsername = GetBooleanParam("showUsername", true);
-const showMessage = GetBooleanParam("showMessage", true);
-const showTopGradient = GetBooleanParam("showTopGradient", true);
-// Word-by-word reveal on message bodies (see writeInMessage). On by default so
-// existing browser-source URLs pick it up; add ?writingAnimation=false to turn it
-// off, which is worth doing if the streaming machine is running hot.
-const writingAnimation = GetBooleanParam("writingAnimation", true);
 /* ── Boil feel: two separate knobs ──────────────────────────────────────────
    boilFps  — how OFTEN the border is redrawn.
    boilStep — how DIFFERENT each redraw is from the one before it.
@@ -71,19 +81,15 @@ const writingAnimation = GetBooleanParam("writingAnimation", true);
 const boilFps = Math.max(1, Math.min(60, GetIntParam("boilFps") || 7));
 const boilStep = Math.max(0, Math.min(4, GetFloatParam("boilStep") ?? 0.178));
 
-const font = urlParams.get("font") || "";
-const fontSize = urlParams.get("fontSize") || "18";
-const contrastOutline = GetBooleanParam("contrastOutline", false);
-// White only makes sense against the outline. With the outline off this stays the
-// original black, so an overlay without ?contrastOutline looks exactly as it did.
-const fontColor = urlParams.get("fontColor") || (contrastOutline ? "#ffffff" : "#000000");
-const background = urlParams.get("background") || "#ffffff";
-const backgroundOpacity = GetIntParam("backgroundOpacity") ?? 100;
+// Chat text is the receipt's ink, or white with the outline over the stream. The
+// size follows normal / compact (22 / 18px); the outline is measured off it once.
+const fontColor = receipt ? "#000000" : "#ffffff";
+const fontSize = compact ? 18 : 22;
 
-const hideAfter = GetIntParam("hideAfter") || 0;
+// Messages starting with "!" are always hidden; ?excludeCommands=false still turns
+// that off. The chatters list (StreamElements, Streamlabs) is hidden entirely.
 const excludeCommands = GetBooleanParam("excludeCommands", true);
-const ignoreChatters = urlParams.get("ignoreChatters") || "";
-const scrollDirection = GetIntParam("scrollDirection") || 1;
+const ignoreChatters = urlParams.get("ignoreChatters") ?? "StreamElements,Streamlabs";
 const imageEmbedPermissionLevel = GetIntParam("imageEmbedPermissionLevel") || 20;
 
 const showTwitchMessages = GetBooleanParam("showTwitchMessages", true);
@@ -93,14 +99,14 @@ const showTwitchRaids = GetBooleanParam("showTwitchRaids", true);
 const showTwitchFollows = GetBooleanParam("showTwitchFollows", true);
 const showTwitchCheers = GetBooleanParam("showTwitchCheers", true);
 const showTwitchChannelPoints = GetBooleanParam("showTwitchChannelPoints", true);
-const showTwitchPowerUps = GetBooleanParam("showTwitchPowerUps", true);
 const showTwitchWatchStreaks = GetBooleanParam("showTwitchWatchStreaks", true);
 
 // Stinger sync: when ON, a Twitch sub/resub/gift/bomb or cheer fades the chat out,
 // lets the separate stinger browser source play, then fades the chat back in and
 // only THEN shows the alert card. Default OFF so existing links (no ?stingers) are
 // unchanged — the settings page only appends ?stingers=true when it's enabled.
-const stingersEnabled = GetBooleanParam("stingers", false);
+// Never with the receipt (the settings page hides the option then, too).
+const stingersEnabled = GetBooleanParam("stingers", false) && !receipt;
 
 const showYouTubeMessages = GetBooleanParam("showYouTubeMessages", true);
 const showYouTubeSuperChats = GetBooleanParam("showYouTubeSuperChats", true);
@@ -109,42 +115,38 @@ const showYouTubeMemberships = GetBooleanParam("showYouTubeMemberships", true);
 const showStreamlabsDonations = GetBooleanParam("showStreamlabsDonations", true);
 const showStreamElementsTips = GetBooleanParam("showStreamElementsTips", true);
 
-if (font) document.body.style.fontFamily = font;
-document.body.style.fontSize = `${fontSize}px`;
-document.documentElement.style.setProperty('--font-color', fontColor);
-if (contrastOutline) document.body.classList.add('contrast-outline');
-
 /* ── Reply arrow + line ──────────────────────────────────────────────────────
-   Drawn as an inline SVG per glyph rather than style.css's masked background, in
-   BOTH modes, because the mask was a latent bug: style.css masks them with
-   url(icons/reply-*.svg), and Chrome treats every file:// document as its own
-   opaque origin — so on a file:// browser source the mask is cross-origin, computes
-   to transparent, and the two glyphs vanish completely. An inline data: URI has no
-   origin to fail.
+   Drawn as an inline SVG per glyph rather than a masked background, because the
+   mask was a latent bug: Chrome treats every file:// document as its own opaque
+   origin — so on a file:// browser source a mask from a file is cross-origin,
+   computes to transparent, and the two glyphs vanish completely. An inline data:
+   URI has no origin to fail.
 
-   Each icon is a single stroked path, so with the outline on it is simply stroked
-   twice: wide in the outline colour underneath, then at its true 3px width in the
-   text colour. With the outline off it is the single 3px stroke in the text colour,
-   which is what the masked version looked like.
-
-   Colours come from fontColor and the outline width from --o-hr, so these follow
-   ?fontColor= instead of being hardcoded. The viewBox is padded by 3 on each side
-   (::before is inset -3px to match) so the wide stroke has room without moving the
-   glyph off where style.css positions it. */
+   Each icon is a single stroked path (the paths in assets/icons/<size>/reply-*.svg), so
+   with the outline on it is simply stroked twice: wide in the outline colour
+   underneath, then at its true width in the text colour. Built for both sizes, so a
+   source resized across the compact breakpoint picks the other pair up in CSS.
+   The viewBox is padded by 3 on each side (::before is inset -3px to match) so the
+   wide stroke has room without moving the glyph. */
 {
-	const _rHr = contrastOutline ? Math.max(0.5, 0.05 * (Number(fontSize) || 18)) : 0;
-	const _rOw = (3 + 2 * _rHr).toFixed(2);
-	const _rSvg = (w, h, vb, d) =>
-		'url("data:image/svg+xml,' + encodeURIComponent(
-			`<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='${vb}'>` +
+	const _rHr = contrastOutline ? Math.max(0.5, 0.05 * fontSize) : 0;
+	const _rSvg = (w, h, sw, d) => {
+		const ow = (sw + 2 * _rHr).toFixed(2);
+		return 'url("data:image/svg+xml,' + encodeURIComponent(
+			`<svg xmlns='http://www.w3.org/2000/svg' width='${w + 6}' height='${h + 6}' viewBox='-3 -3 ${w + 6} ${h + 6}'>` +
 			(_rHr > 0
-				? `<path d='${d}' fill='none' stroke='#000000' stroke-width='${_rOw}' stroke-linecap='round' stroke-linejoin='round'/>`
+				? `<path d='${d}' fill='none' stroke='#000000' stroke-width='${ow}' stroke-linecap='round' stroke-linejoin='round'/>`
 				: '') +
-			`<path d='${d}' fill='none' stroke='${fontColor}' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/>` +
+			`<path d='${d}' fill='none' stroke='${fontColor}' stroke-width='${sw}' stroke-linecap='round' stroke-linejoin='round'/>` +
 			`</svg>`) + '")';
-	document.documentElement.style.setProperty('--o-reply-arrow', _rSvg(20, 20, '-3 -3 20 20',
-		'M1.49996 1.5L1.49996 4.55263C1.5 7 3 8.52632 5.5 8.52632L11.9102 8.52632M8.95 5.05263L11.9102 8.52632L8.95 12'));
-	document.documentElement.style.setProperty('--o-reply-line', _rSvg(9, 24, '-3 -3 9 24', 'M1.5 1.5V16.5'));
+	};
+	const root = document.documentElement.style;
+	root.setProperty('--o-reply-arrow', _rSvg(36, 28, 3,
+		'M18 6V9.48872C18 12.2857 19.7143 14.0301 22.5715 14.0301L29.8974 14.0301M26.5143 10.0602L29.8974 14.0301L26.5143 18'));
+	root.setProperty('--o-reply-line', _rSvg(36, 28, 3, 'M18 6L18 22'));
+	root.setProperty('--o-reply-arrow-compact', _rSvg(28, 22, 2.5,
+		'M14 3V6.48872C14 9.28571 15.7143 11.0301 18.5715 11.0301L25.8974 11.0301M22.5143 7.06015L25.8974 11.0301L22.5143 15'));
+	root.setProperty('--o-reply-line-compact', _rSvg(28, 22, 2.5, 'M14 4L14 18'));
 }
 
 /* The extrude chain, still carrying its unresolved var(--o-colour).
@@ -189,16 +191,15 @@ if (contrastOutline) {
 		colour: '#000000',
 	};
 
-	const _oFs    = Number(fontSize) || 18;
+	const _oFs    = fontSize;
 	const _oHr    = Math.max(0.5, OUTLINE.hrEm * _oFs);
 	const _oDepth = OUTLINE.depthEm * _oFs;
 
 	// N passes of exactly one screen pixel each along the direction vector. Built once at
 	// load, so a source resized while live needs a refresh to rebuild it.
 	function BuildExtrudeFilter(totalPx) {
-		// Step in whole SCREEN pixels. Under zoom a CSS 1px is 1.29+ screen px, so 1px CSS
-		// steps landed between pixels and the extrude edge came out choppy.
-		const unit = 1 / cssZoom, n = Math.round(totalPx * cssZoom);
+		// Step in whole pixels (nothing is zoomed, so a CSS px is a screen px).
+		const unit = 1, n = Math.round(totalPx);
 		if (n < 1) return 'none';
 		const out = [];
 		// var() rather than the literal: the colour is resolved on the element that
@@ -279,17 +280,8 @@ if (contrastOutline) {
 
 
 const mainContainer = document.getElementById('mainContainer');
-mainContainer.style.background = hexToRgba(background, backgroundOpacity / 100);
-
-if (showTopGradient) {
-	mainContainer.classList.add('show-gradient');
-}
-
 const ignoreUserList = ignoreChatters.split(',').map(item => item.trim().toLowerCase());
 const messageList = document.getElementById('messageList');
-
-if (scrollDirection === 1) messageList.classList.add('normalScrollDirection');
-else if (scrollDirection === 2) messageList.classList.add('reverseScrollDirection');
 
 const client = new StreamerbotClient({
 	host: sbServerAddress,
@@ -311,7 +303,6 @@ client.on('Twitch.Follow', (data) => TwitchFollow(data.data));
 client.on('Twitch.Cheer', (data) => TwitchCheer(data.data));
 client.on('Twitch.AutomaticRewardRedemption', (data) => TwitchAutomaticRewardRedemption(data.data));
 client.on('Twitch.RewardRedemption', (data) => TwitchRewardRedemption(data.data));
-client.on('Twitch.CustomPowerUpRedemption', (data) => TwitchCustomPowerUpRedemption(data.data));
 client.on('Twitch.WatchStreak', (data) => TwitchWatchStreak(data.data));
 client.on('Twitch.UserTimedOut', (data) => TwitchUserBanned(data.data));
 client.on('Twitch.SharedChatMessageDeleted', (data) => TwitchChatMessageDeleted(data.data));
@@ -322,6 +313,7 @@ client.on('YouTube.Message', (data) => YouTubeMessage(data.data));
 client.on('YouTube.SuperChat', (data) => YouTubeSuperChat(data.data));
 client.on('YouTube.NewSponsor', (data) => YouTubeNewSponsor(data.data));
 client.on('YouTube.MembershipGift', (data) => YouTubeGiftMembershipReceived(data.data));
+client.on('YouTube.NewSubscriber', (data) => YouTubeNewSubscriber(data.data));
 
 client.on('Streamlabs.Donation', (data) => StreamlabsDonation(data.data));
 client.on('StreamElements.Tip', (data) => StreamElementsTip(data.data));
@@ -331,41 +323,21 @@ const avatarMap = new Map();
 
 // Username / accent color per platform. Used by branded event cards.
 const PLATFORM_COLORS = {
-	twitch: '#A644FF',
+	twitch: '#9146FF',
 	youtube: '#FF0000',
 	streamlabs: '#80F5D2',
 	streamelements: '#5599FF',
 };
 function GetPlatformColor(platform) {
-	return PLATFORM_COLORS[platform] || '#A644FF';
+	return PLATFORM_COLORS[platform] || '#9146FF';
 }
-// Platforms that have an icon file in icons/platforms/. Others skip the platform badge.
+// Platforms that have an icon in assets/icons/*/platforms/. Others skip the platform badge.
 const PLATFORMS_WITH_ICONS = new Set(['twitch', 'youtube']);
 
+// No status label on the overlay itself: the settings page's preview shows a
+// "Connected" pill instead, so the state is handed up to it.
 function SetConnectionStatus(connected) {
-	let statusContainer = document.getElementById("statusContainer");
-	if (connected) {
-		statusContainer.style.background = "#2FB774";
-		statusContainer.innerText = "Connected!";
-		statusContainer.style.opacity = 1;
-		setTimeout(() => {
-			statusContainer.style.transition = "all 2s ease";
-			statusContainer.style.opacity = 0;
-		}, 10);
-	}
-	else {
-		statusContainer.style.background = "#D12025";
-		statusContainer.innerText = "Connecting...";
-		statusContainer.style.transition = "";
-		statusContainer.style.opacity = 1;
-	}
-}
-
-function hexToRgba(hex, alpha) {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+	if (window.parent !== window) window.parent.postMessage({ chatbox: connected ? 'connected' : 'disconnected' }, '*');
 }
 
 // Usernames keep their own colour everywhere so cards and chat look identical
@@ -510,25 +482,38 @@ function LookupTwitchBadges(...keys) {
 	return [];
 }
 
-// The one place badges become <img>s — chat and cards share it so the bits filter and
-// the ordering can't drift apart.
+// Badge art shared by both platforms: YouTube's roles map onto these, and on Twitch the
+// broadcaster (Twitch's camera on #2D2D2D) and subscriber (our skull on #2D2D2D) replace
+// Twitch's own — for subs that includes any per-month art a channel uploaded. Twitch's
+// other badges keep the URL from the payload.
+const BADGE_ART = {
+	broadcaster: 'assets/icons/badges/broadcaster.png',
+	moderator:   'assets/icons/badges/moderator.png',
+	vip:         'assets/icons/badges/vip.png',
+	subscriber:  'assets/icons/badges/subscriber.svg',
+};
+const OWN_BADGES = ['broadcaster', 'subscriber'];
+
+// The one place badges become <img>s — chat, cards and both platforms share it so the
+// bits filter, the broadcaster swap and the ordering can't drift apart.
 function RenderBadgeList(div, badges) {
 	if (!div) return;
 	div.innerHTML = '';
-	(badges || []).filter(b => b && b.imageUrl && !IsTwitchBitsBadge(b)).forEach(b => {
-		const img = new Image(); img.src = b.imageUrl; img.classList.add('badge');
+	(badges || []).filter(b => b && b.imageUrl && !BadgeIs(b, 'bits')).forEach(b => {
+		const own = OWN_BADGES.find(id => BadgeIs(b, id));
+		const img = new Image(); img.src = own ? BADGE_ART[own] : b.imageUrl; img.classList.add('badge');
 		div.appendChild(img);
 	});
 }
 
 // Twitch's own Bits badge is the SAME gem art and the SAME tier colours as the session
-// badge (icons/bit-*.svg are that artwork), so a cheerer would carry two near-identical
+// badge (assets/icons/*/bit-*.svg are that artwork), so a cheerer would carry two near-identical
 // gems — Twitch's lifetime one and this stream's. Drop Twitch's and keep ours.
 // Matched on the value rather than a field name: Streamer.bot's badge objects are not
-// documented here, and the set id is the string "bits" whichever key carries it. A badge
-// we fail to recognise simply still renders, which is the old behaviour.
-function IsTwitchBitsBadge(b) {
-	return !!b && Object.values(b).some(v => typeof v === 'string' && v.toLowerCase() === 'bits');
+// documented here, and the set id ("bits", "broadcaster") is the string whichever key
+// carries it. A badge we fail to recognise simply renders as Twitch sent it.
+function BadgeIs(b, id) {
+	return !!b && Object.values(b).some(v => typeof v === 'string' && v.toLowerCase() === id);
 }
 
 // null below 1 bit — no badge for someone who hasn't cheered.
@@ -579,8 +564,7 @@ async function renderFeaturedMessage(data, headerText, platform) {
 		const avatarUrl = await GetAvatar(data.user.name, data.user.profileImageUrl, platform);
 		instance.querySelector("#avatar").innerHTML = `<img src="${avatarUrl}" class="avatar">`;
 
-		const platformIcon = platform === 'twitch' ? 'icons/platforms/twitch.png' : 'icons/platforms/youtube.png';
-		instance.querySelector("#platform").innerHTML = `<img src="${platformIcon}">`;
+		instance.querySelector("#platform").innerHTML = iconImg(`platforms/${platform}`, 'platform');
 	} else {
 		instance.querySelector("#avatar").style.display = 'none';
 		instance.querySelector("#platform").style.display = 'none';
@@ -594,7 +578,7 @@ async function renderFeaturedMessage(data, headerText, platform) {
 	const tempDiv = document.createElement('div');
 	tempDiv.innerText = textContent;
 	let escapedText = tempDiv.innerHTML;
-	const platformColor = platform === 'twitch' ? '#A644FF' : '#FF0000';
+	const platformColor = platform === 'twitch' ? '#9146FF' : '#FF0000';
 	escapedText = escapedText.replace(/(^|\s)(@[^\s<]+)/g, `$1<span style="font-weight: bold; color: ${platformColor};">$2</span>`);
 	escapedText = linkify(escapedText);
 
@@ -609,6 +593,12 @@ async function renderFeaturedMessage(data, headerText, platform) {
 	AddSubCardItem(instance, data.messageId || data.eventId, platform, data.user.id);
 }
 
+// An icon and the words that go with it in an event description: "📅 14 Months",
+// "⦿ 300", or with the icon after them, "Cheered 100 💎".
+function EvGroup(icon, text, iconAfter = false) {
+	return `<span class="ev-group">${iconAfter ? text + iconImg(icon) : iconImg(icon) + text}</span>`;
+}
+
 async function renderEventCard(data, type, platform, opts = {}) {
 	const template = document.getElementById('subCardTemplate');
 	const instance = template.content.cloneNode(true);
@@ -618,34 +608,20 @@ async function renderEventCard(data, type, platform, opts = {}) {
 	const usernameDiv = instance.querySelector("#username");
 	const timestampDiv = instance.querySelector("#timestamp");
 	const descDiv = instance.querySelector(".sub-description");
-	const iconImg = instance.querySelector(".sub-skull-icon");
-	const iconArea = instance.querySelector(".sub-icon-area"); // Grab the invisible spacer box
+	const iconArea = instance.querySelector(".sub-icon-area");
+	instance.querySelector(".sub-event-container").dataset.type = type;   // style.css keys off it
 
-	// Icon-less event types: remove the image and the invisible spacer entirely
-	// (cheer now gets a tier-colored bit-jar icon passed in via opts.icon)
-	if (type === 'channelpoint' || type === 'powerup' || type === 'watchstreak') {
-		// Completely delete the image and the invisible spacing box from the HTML!
-		if (iconImg) iconImg.remove();
-		if (iconArea) iconArea.remove();
-	} else { 
-		// Event type -> [icon file, css class]. New categories use placeholder icons
-		// watchstreak has been removed from this map; cheer passes its icon via opts
-		const ICON_MAP = {
-			raid: ['icons/raid-bell.svg', 'sub-raid-icon'],
-			donation: ['icons/donation-paper-bag.svg', 'sub-donation-icon'],
-			superchat: ['icons/donation-paper-bag.svg', 'sub-donation-icon'],
-			follow: ['icons/follow-heart.svg', 'sub-follow-icon']
-		};
-		
-		const [iconSrc, iconCls] = opts.icon 
-			? [opts.icon, opts.iconClass || 'sub-skull-icon'] 
-			: (ICON_MAP[type] || ['icons/sub-skull.svg', 'sub-skull-icon']);
-
-		if (iconImg) {
-			iconImg.src = iconSrc;
-			iconImg.className = iconCls;
-		}
+	// Icon-less types are the channel-point card: no icon box at all.
+	if (type === 'channelpoint' || type === 'watchstreak') {
+		iconArea.remove();
+	} else {
+		// Event type -> icon (assets/icons/<size>/<name>.svg, which fills the icon box).
+		// Cheers pass their tier-coloured bit jar in opts.icon.
+		const ICON_MAP = { raid: 'raid-bell', donation: 'donation-paper-bag', superchat: 'donation-paper-bag' };
+		iconArea.innerHTML = iconImg(opts.icon || ICON_MAP[type] || 'sub-skull', 'event-icon');
 	}
+	const giftArrow = instance.querySelector(".gift-arrow-icon");
+	if (giftArrow) { giftArrow.src = iconSrc('gift-arrow'); giftArrow.dataset.icon = 'gift-arrow'; }
 
 	if (showTimestamps) {
 		timestampDiv.classList.add("timestamp");
@@ -663,7 +639,7 @@ async function renderEventCard(data, type, platform, opts = {}) {
 	}
 
 	if (showPlatform && senderName !== 'Anonymous' && PLATFORMS_WITH_ICONS.has(platform)) {
-		platformDiv.innerHTML = `<img src="icons/platforms/${platform}.png" class="platform"/>`;
+		platformDiv.innerHTML = iconImg(`platforms/${platform}`, 'platform');
 		platformDiv.style.display = 'flex';
 	} else {
 		platformDiv.style.display = 'none';
@@ -696,7 +672,7 @@ async function renderEventCard(data, type, platform, opts = {}) {
 				const recAvatarURL = await GetAvatar(receiverName, data.recipient?.profileImageUrl, platform);
 				recAvatarDiv.innerHTML = `<img src="${recAvatarURL}" class="avatar">`;
 			}
-			if (showPlatform) instance.querySelector("#receiver-platform").innerHTML = `<img src="icons/platforms/${platform}.png" class="platform"/>`;
+			if (showPlatform) instance.querySelector("#receiver-platform").innerHTML = iconImg(`platforms/${platform}`, 'platform');
 
 			// Sender + receiver names become scrolling marquees that split the row's
 			// width by max-min fairness (allocateGiftRow), replacing the old ellipsis.
@@ -725,16 +701,17 @@ async function renderEventCard(data, type, platform, opts = {}) {
 		usernameDiv.replaceWith(usernameMarquee(senderName, usernameDiv.style.color));
 	}
 
-	// opts.description (may contain HTML) overrides the built-in text for a type.
+	// opts.description (may contain HTML) overrides the built-in text for a type. An icon
+	// and the figure it goes with sit together in an .ev-group (see EvGroup).
 	let description = opts.description || '';
 	if (!opts.description) {
 		switch(type) {
 			case 'sub':
-				description = data.is_prime || data.isPrime ? `Used Their Prime Sub` : `Subscribed With Tier ${String(data.sub_tier || data.subTier || '1').charAt(0)}`;
+				description = data.is_prime || data.isPrime ? `Used Their Prime Sub` : `Subscribed with Tier ${String(data.sub_tier || data.subTier || '1').charAt(0)}`;
 				break;
 			case 'resub':
 				const months = data.cumulativeMonths || '14';
-				description = data.isPrime ? `Used Their Prime Sub {calendar} ${months} Months` : `Resubscribed With Tier ${String(data.subTier || '1').charAt(0)} {calendar} ${months} Months`;
+				description = (data.isPrime ? `Used Their Prime Sub` : `Resubscribed with Tier ${String(data.subTier || '1').charAt(0)}`) + EvGroup('calendar', `${months} Months`);
 				break;
 			case 'gift':
 				description = platform === 'twitch' ? `Gifted a Tier ${String(data.subTier || '1').charAt(0)} Subscription` : `Gifted a Channel Membership`;
@@ -751,46 +728,26 @@ async function renderEventCard(data, type, platform, opts = {}) {
 			case 'superchat':
 				description = `Donated ${data.amount} Through Super Chat`;
 				break;
-			case 'follow':
-				description = `Followed`;
-				break;
-			case 'cheer':
-				description = `Cheered ${data.bits} Bits`;
-				break;
 			case 'watchstreak':
 				description = `On a ${data.streakCount} Stream Streak!`;
 				break;
 		}
 	}
 
-	const calendarImg = `<img src="icons/calendar.svg" class="sub-calendar-icon">`;
-	descDiv.innerHTML = description.replace('{calendar}', calendarImg);
+	// A clipped event line scrolls like a username: to the end, then fades back.
+	descDiv.innerHTML = `<div class="mq fade desc-mq" data-mq-mode="fadeswap"><span class="mq-inner">${description}</span></div>`;
 
 	const commentWrapper = instance.querySelector(".sub-comment-wrapper");
 	const message = data.text || (typeof data.message === 'string' ? data.message : '');
-	let hasComment = false;
 
+	// The attachment (a song card, or the viewer's own message) stacks under the header.
 	if (opts.htmlContent) {
 		commentWrapper.style.display = "block";
-		const commentTextEl = instance.querySelector(".sub-comment-text");
-		commentTextEl.innerHTML = opts.htmlContent;
-		// Song-request cards get slightly wider right padding (see .is-song-request in CSS).
-		if (/music-ui-container/.test(opts.htmlContent)) {
-			commentWrapper.querySelector(".sub-comment-content")?.classList.add("is-song-request");
-		}
-		hasComment = true;
+		commentWrapper.classList.toggle('is-song', /music-ui-container/.test(opts.htmlContent));
+		instance.querySelector(".sub-comment-text").innerHTML = opts.htmlContent;
 	} else if (message && message.trim().length > 0) {
 		commentWrapper.style.display = "block";
-		const commentTextEl = instance.querySelector(".sub-comment-text");
-		commentTextEl.innerHTML = linkify(escapeHtml(message));
-		hasComment = true;
-	}
-
-	// Event cards with a comment attached trim the header's bottom padding so it sits
-	// tighter against the comment below (cheers, power-ups, channel points, etc.).
-	// Subs/resubs are excluded — they keep the balanced 12px.
-	if (hasComment && type !== 'sub' && type !== 'resub') {
-		instance.querySelector('.sub-card-content')?.classList.add('has-comment');
+		instance.querySelector(".sub-comment-text").innerHTML = linkify(escapeHtml(message));
 	}
 
 	AddSubCardItem(instance, data.messageId || data.eventId, platform, data.user?.id);
@@ -808,11 +765,11 @@ async function TwitchChatMessage(data) {
 	const instance = template.content.cloneNode(true);
 
 	const replyDiv = instance.querySelector("#reply");
-	if (data.message.isReply && showMessage) {
+	if (data.message.isReply) {
 		replyDiv.style.display = 'flex';
 		const replyUserDiv = instance.querySelector("#replyUser");
 		replyUserDiv.innerText = data.message.reply.userName;
-		const rc = usernameChatColor('#A644FF');
+		const rc = usernameChatColor('#9146FF');
 		replyUserDiv.style.color = rc;
 		const rInk = usernameInk(rc);
 		if (rInk) {
@@ -840,14 +797,12 @@ async function TwitchChatMessage(data) {
 	}
 
 	const messageDiv = instance.querySelector("#message");
-	if (showMessage) {
-		messageDiv.innerText = data.message.message;
-		messageDiv.innerHTML = messageDiv.innerHTML.replace(/(^|\s)(@[^\s<]+)/g, `$1<span style="font-weight: bold; color: #A644FF;">$2</span>`);
-		messageDiv.innerHTML = linkify(messageDiv.innerHTML);
-	}
+	messageDiv.innerText = data.message.message;
+	messageDiv.innerHTML = messageDiv.innerHTML.replace(/(^|\s)(@[^\s<]+)/g, `$1<span style="font-weight: bold; color: #9146FF;">$2</span>`);
+	messageDiv.innerHTML = linkify(messageDiv.innerHTML);
 	if (data.message.isMe) messageDiv.style.color = data.message.color;
 
-	if (showPlatform) instance.querySelector("#platform").innerHTML = `<img src="icons/platforms/twitch.png" class="platform"/>`;
+	if (showPlatform) instance.querySelector("#platform").innerHTML = iconImg('platforms/twitch', 'platform');
 
 	if (showBadges) {
 		const badgeListDiv = instance.querySelector("#badgeList");
@@ -855,7 +810,7 @@ async function TwitchChatMessage(data) {
 		// Session cheer badge — last in the row, so Twitch's own badges keep their order.
 		const bitColor = BitTierColor(LookupTwitchBits(data.message.userId, data.message.username, data.message.displayName, data.user?.id));
 		if (bitColor) {
-			const gem = new Image(); gem.src = `icons/bit-${bitColor}.svg`;
+			const gem = new Image(); gem.src = iconSrc(`bit-${bitColor}`); gem.dataset.icon = `bit-${bitColor}`;
 			gem.classList.add("badge", "bit-badge");
 			badgeListDiv.appendChild(gem);
 		}
@@ -1055,7 +1010,7 @@ async function renderFollowCard(data, platform, action = 'followed') {
 	}
 
 	if (showPlatform && PLATFORMS_WITH_ICONS.has(platform)) {
-		platformDiv.innerHTML = `<img src="icons/platforms/${platform}.png" class="platform"/>`;
+		platformDiv.innerHTML = iconImg(`platforms/${platform}`, 'platform');
 	} else {
 		platformDiv.style.display = 'none';
 	}
@@ -1107,112 +1062,54 @@ async function TwitchCheer(data) {
 	}
 	text = text.trim();
 
-	// Pick the bit gem color based on cheer amount (local bit-<color>.svg icons).
+	// Pick the bit gem color based on cheer amount (assets/icons/*/bit-<color>.svg).
 	// Twitch tiers: 1-99 gray, 100-999 purple, 1000-4999 green, 5000-9999 blue, 10000+ red.
 	const bitColor = BitTierColor(data.bits || 0) || 'gray';
 
-	const bitIcon = `<img src="icons/bit-${bitColor}.svg" class="sub-bit-gem-icon">`;
-
-	const description = `Cheered ${data.bits}${bitIcon}`;
-	// Tier-colored bit-jar card icon, matching the gem color picked above.
+	// "Cheered 100 💎", with the tier's bit jar as the card's icon.
+	const description = EvGroup(`bit-${bitColor}`, `Cheered ${data.bits}`, true);
 	stingerGateCard(() => renderEventCard({ user: data.user, bits: data.bits, text }, 'cheer', 'twitch', {
 		description,
-		icon: `icons/bit-jar-${bitColor}.svg`,
-		iconClass: 'sub-bit-jar-icon',
+		icon: `bit-jar-${bitColor}`,
 	}));
 }
-const _outlineCache = new Map();
-function makeOutlinedIcon(srcUrl, outlinePx = 5, outlineColor = '#000') {
-	const cacheKey = `${srcUrl}|${outlinePx}|${outlineColor}`;
-	if (_outlineCache.has(cacheKey)) return _outlineCache.get(cacheKey);
-	const p = new Promise((resolve) => {
-		const img = new Image();
-		img.crossOrigin = "anonymous";
-		img.onload = () => {
-			const w = img.naturalWidth, h = img.naturalHeight, pad = outlinePx + 2;
-			const cw = w + pad * 2, ch = h + pad * 2;
-			// 1) colored silhouette of the source
-			const sil = document.createElement('canvas');
-			sil.width = cw; sil.height = ch;
-			const sx = sil.getContext('2d');
-			sx.drawImage(img, pad, pad, w, h);
-			sx.globalCompositeOperation = 'source-in';
-			sx.fillStyle = outlineColor;
-			sx.fillRect(0, 0, cw, ch);
-			// 2) stamp silhouette in a full ring of offsets to dilate -> hard outline
-			const out = document.createElement('canvas');
-			out.width = cw; out.height = ch;
-			const ox = out.getContext('2d');
-			for (let a = 0; a < 360; a += 12) {
-				ox.drawImage(sil, Math.round(Math.cos(a * Math.PI / 180) * outlinePx),
-				                  Math.round(Math.sin(a * Math.PI / 180) * outlinePx));
-			}
-			// 3) original art on top
-			ox.drawImage(img, pad, pad, w, h);
-			resolve(out.toDataURL());
-		};
-		img.onerror = () => resolve(srcUrl); // fall back to raw image if it fails
-		img.src = srcUrl;
-	});
-	_outlineCache.set(cacheKey, p);
-	return p;
+
+// The song card a song request carries (and the settings preview's demo one).
+function SongCardHTML(songInfo) {
+	// Fallback transparent pixel if no art is found so the layout doesn't break
+	const artUrl = songInfo.albumArt || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+	// Title / album / artist scroll (Apple-smooth wrap) instead of ellipsis-
+	// truncating, ported from the Music-Info-Card song card.
+	return `
+		<div class="music-ui-container">
+			<img class="music-ui-art" src="${artUrl}" onerror="this.style.visibility='hidden'" />
+			<div class="music-ui-info">
+				${marqueeHTML(songInfo.title, { mode: 'smooth', fade: true, cls: 'music-ui-title' })}
+				${songInfo.album ? marqueeHTML(songInfo.album, { mode: 'smooth', fade: true, cls: 'music-ui-album' }) : ''}
+				<div class="music-ui-artist-row">
+					${marqueeHTML(songInfo.artist, { mode: 'smooth', fade: true, cls: 'music-ui-artist' })}
+					<span class="music-ui-duration">${iconImg('clock', 'music-ui-clock')}${FormatSongDuration(songInfo.durationMs)}</span>
+				</div>
+			</div>
+		</div>`;
 }
+
+// "Redeemed Song Request ⦿ 300" — the channel-point icon, not the reward's own art.
+const ChannelPointDescription = (title, cost) => `Redeemed ${escapeHtml(title)}` + EvGroup('channel-point', cost);
 
 async function TwitchRewardRedemption(data) {
 	if (!showTwitchChannelPoints) return;
 	const user = { id: data.user_id, name: data.user_name, login: data.user_login };
-
-	let rewardImageUrl = "https://static-cdn.jtvnw.net/custom-reward-images/default-2.png";
-
-	if (data.reward && data.reward.image && data.reward.image.url_2x) {
-		rewardImageUrl = data.reward.image.url_2x;
-	} else if (data.reward && data.reward.defaultImage && data.reward.defaultImage.url_2x) {
-		rewardImageUrl = data.reward.defaultImage.url_2x;
-	}
-
-	const outlinedUrl = await makeOutlinedIcon(rewardImageUrl, 5);
-	const cpIcon = `<img src="${outlinedUrl}" class="sub-inline-icon" style="filter: none; height: 1.6em; width: auto; margin: 0 4px; vertical-align: -0.45em;">`;
-
-	const description = `Redeemed ${escapeHtml(data.reward.title)}${cpIcon}${data.reward.cost}`;
+	const description = ChannelPointDescription(data.reward.title, data.reward.cost);
 	let text = data.user_input || '';
 	let htmlContent = null;
 
 	if (data.reward && data.reward.title && data.reward.title.toLowerCase().includes("song request")) {
 		const songInfo = await GetSongInfo(text);
-		if (songInfo) {
-			// Fallback transparent pixel if no art is found so the layout doesn't break
-			const artUrl = songInfo.albumArt || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-
-			// Title / album / artist scroll (Apple-smooth wrap) instead of ellipsis-
-			// truncating, ported from the Music-Info-Card song card.
-			htmlContent = `
-				<div class="music-ui-container">
-					<img class="music-ui-art" src="${artUrl}" onerror="this.style.display='none'" />
-					<div class="music-ui-info">
-						${marqueeHTML(songInfo.title, { mode: 'smooth', fade: true, cls: 'music-ui-title' })}
-						${songInfo.album ? marqueeHTML(songInfo.album, { mode: 'smooth', fade: true, cls: 'music-ui-album' }) : ''}
-						<div class="music-ui-artist-row">
-							${marqueeHTML(songInfo.artist, { mode: 'smooth', fade: true, cls: 'music-ui-artist' })}
-							<span class="music-ui-duration">
-								<img src="icons/icon-clock.svg" class="music-ui-clock" />
-								${FormatSongDuration(songInfo.durationMs)}
-							</span>
-						</div>
-					</div>
-				</div>
-			`;
-		}
+		if (songInfo) htmlContent = SongCardHTML(songInfo);
 	}
 
 	await renderEventCard({ ...data, user, text }, 'channelpoint', 'twitch', { description, htmlContent });
-}
-
-// ===== Custom Power-Up (bits) =====
-async function TwitchCustomPowerUpRedemption(data) {
-	if (!showTwitchPowerUps) return;
-	const bitIcon = `<img src="icons/badges/twitch-bit.svg" class="sub-inline-icon">`;
-	const description = `Redeemed ${escapeHtml(data.customPowerUp.title)} ${bitIcon} ${data.customPowerUp.bits}`;
-	await renderEventCard({ ...data, text: data.userInput || '' }, 'powerup', 'twitch', { description });
 }
 
 // ===== Watch streak =====
@@ -1257,7 +1154,9 @@ async function TwitchGiftSub(data) { if (!showTwitchSubs) return; stingerTrigger
 
 function TwitchChatMessageDeleted(data) {
 	document.querySelectorAll(`li[id="${data.messageId}"]`).forEach(item => {
-		item.style.opacity = 0; 
+		item.style.height = item.offsetHeight + 'px';   // from auto, so the collapse animates
+		item.offsetHeight;
+		item.style.opacity = 0;
 		item.style.height = 0;
 		item.style.paddingTop = 0;
 		item.style.paddingBottom = 0;
@@ -1291,23 +1190,18 @@ async function YouTubeMessage(data) {
 	}
 
 	const messageDiv = instance.querySelector("#message");
-	if (showMessage) {
-		messageDiv.innerText = data.message;
-		messageDiv.innerHTML = messageDiv.innerHTML.replace(/(^|\s)(@[^\s<]+)/g, `$1<span style="font-weight: bold; color: #FF0000;">$2</span>`);
-		messageDiv.innerHTML = linkify(messageDiv.innerHTML);
-	}
+	messageDiv.innerText = data.message;
+	messageDiv.innerHTML = messageDiv.innerHTML.replace(/(^|\s)(@[^\s<]+)/g, `$1<span style="font-weight: bold; color: #FF0000;">$2</span>`);
+	messageDiv.innerHTML = linkify(messageDiv.innerHTML);
 
-	if (showPlatform) instance.querySelector("#platform").innerHTML = `<img src="icons/platforms/youtube.png" class="platform"/>`;
+	if (showPlatform) instance.querySelector("#platform").innerHTML = iconImg('platforms/youtube', 'platform');
 
 	if (showBadges) {
-		const badgeListDiv = instance.querySelector("#badgeList");
-		badgeListDiv.innerHTML = ""; 
-		const addBadge = (icon, invert = true) => { const b = new Image(); b.src = `icons/badges/${icon}`; if (invert) b.style.filter = `invert(100%)`; b.classList.add("badge"); badgeListDiv.appendChild(b); };
-		// Broadcaster uses Twitch's own badge art (already coloured, so no invert).
-		if (data.user.isOwner) addBadge('twitch-broadcaster.png', false);
-		if (data.user.isModerator) addBadge('youtube-moderator.svg');
-		if (data.user.isSponsor) addBadge('youtube-member.svg');
-		if (data.user.isVerified) addBadge('youtube-verified.svg');
+		// YouTube roles in Twitch's badge art: owner, mod (sword), member (star). Verified has none.
+		const u = data.user;
+		RenderBadgeList(instance.querySelector("#badgeList"),
+			[u.isOwner && 'broadcaster', u.isModerator && 'moderator', u.isSponsor && 'subscriber']
+				.filter(Boolean).map(name => ({ name, imageUrl: BADGE_ART[name] })));
 	}
 
 	data.emotes.forEach(e => { messageDiv.innerHTML = messageDiv.innerHTML.replace(new RegExp(e.name, 'g'), `<img src="${e.imageUrl}" class="emote"/>`); });
@@ -1346,8 +1240,15 @@ async function YouTubeSuperChat(data) {
 	if (!data.user) data.user = { id: data.eventId || 'yt-user', name: data.user ? data.user.name : 'YouTube Fan' };
 	await renderEventCard(data, 'superchat', 'youtube');
 }
+// A membership is YouTube's sub; "subscribed" is now the subscriber card below.
 async function YouTubeNewSponsor(data) {
 	if (!showYouTubeMemberships) return;
+	await renderFollowCard(data, 'youtube', 'became a member');
+}
+// YouTube's follow. Streamer.bot gets these through its StreamElements integration,
+// and a test event carries no user, so those are skipped. No setting of its own.
+async function YouTubeNewSubscriber(data) {
+	if (!data?.user) return;
 	await renderFollowCard(data, 'youtube', 'subscribed');
 }
 async function YouTubeGiftMembershipReceived(data) {
@@ -1399,9 +1300,13 @@ const Simplex3D = (function () {
 	};
 })();
 
-const BOIL_CFG = { cornerRadius: 20, strokeWidth: 7, noiseFreq: 4.2, noiseCoordScale: 0.006, noiseTimeScale: 1.0, noiseAmp: 1.5, divW: 200, divH: 60, divCorner: 10, padding: 10 };
+const BOIL_CFG = { cornerRadius: 24, strokeWidth: 8, noiseFreq: 4.2, noiseCoordScale: 0.006, noiseTimeScale: 1.0, noiseAmp: 1.5, divW: 200, divH: 60, divCorner: 10, padding: 10 };
+// Card colours: the card tokens in style.css (the cards have no dark mode).
+const cardTokens = getComputedStyle(document.documentElement);
+const CARD_SURFACE = cardTokens.getPropertyValue('--card-surface').trim() || '#ffffff';
+const CARD_STROKE = cardTokens.getPropertyValue('--card-stroke').trim() || '#000000';
 // How far the line wanders off true. Capped at 4: the card sits inside 10px of
-// padding and the stroke eats 3.5 of it, so past ~6 the outline would clip.
+// padding and the stroke eats 4 of it, so past ~6 the outline would clip.
 BOIL_CFG.noiseAmp = Math.max(0, Math.min(4, GetFloatParam("boilAmp") ?? BOIL_CFG.noiseAmp));
 function boilBuildBasePath(W, H, R) {
 	const pts =[]; const { divW, divH, divCorner } = BOIL_CFG;
@@ -1504,26 +1409,47 @@ window.BOIL = {
 	set amp(v) { BOIL_CFG.noiseAmp = Math.max(0, Math.min(6, v)); },
 };
 
-function initBoilingBorder(canvas, contentW, contentH, bottomExtension = 0) {
-	const P = BOIL_CFG.padding, R = BOIL_CFG.cornerRadius, cw = contentW + P*2, ch = contentH + P*2 + bottomExtension;
-	canvas.style.width = cw + 'px'; canvas.style.height = ch + 'px';
+/* Cards change size after they're shown: without the receipt they fill the
+   source's width, so resizing the source reflows them (and their wrapped text).
+   One observer for every card; each wrapper carries its own re-measure. */
+const boilResize = new ResizeObserver(entries => { for (const e of entries) e.target._boilMeasure?.(); });
+
+function initBoilingBorder(canvas, wrapper, bottomExtension = 0) {
+	const P = BOIL_CFG.padding, R = BOIL_CFG.cornerRadius;
+	let cw = 0, ch = 0, basePath = [];
 	const ctx = canvas.getContext('2d');
+	const seed = Math.random() * 1000;
+	let firstTs = 0, heldIdx = null, lastDrawnIdx = -1;
 	// Sizing a canvas allocates its backing store and resets the context state, so
-	// the dpr scale has to be re-applied every time — on first use and again if the
-	// buffer was released while off screen and the card comes back into view.
+	// the dpr scale has to be re-applied every time — on first use, again if the
+	// buffer was released while off screen, and whenever the card is resized.
 	let sized = false;
 	function sizeCanvas() {
-		// Draw at the size it ends up on screen (zoom), not 1x, or it's stretched and blurry.
-		const px = dpr * cssZoom;
-		canvas.width = Math.ceil(cw * px); canvas.height = Math.ceil(ch * px);
-		ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.scale(px, px);
+		canvas.width = Math.ceil(cw * dpr); canvas.height = Math.ceil(ch * dpr);
+		ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.scale(dpr, dpr);
 		sized = true;
 	}
 	function releaseCanvas() {
 		canvas.width = 0; canvas.height = 0;   // hands the pixels back to the browser
 		sized = false;
 	}
-	const basePath = boilBuildBasePath(contentW, contentH + bottomExtension, R), seed = Math.random() * 1000;
+	function measure() {
+		const w = wrapper.offsetWidth, h = wrapper.offsetHeight;
+		if (!w || !h || (w + P*2 === cw && h + P*2 + bottomExtension === ch)) return;
+		cw = w + P*2; ch = h + P*2 + bottomExtension;
+		canvas.style.width = cw + 'px'; canvas.style.height = ch + 'px';
+		basePath = boilBuildBasePath(w, h + bottomExtension, R);
+		if (!sized) return;
+		// Resizing a canvas wipes it, so repaint now, before this frame is drawn: left to
+		// the next tick, the card sat outline-less for a frame on every step of a resize.
+		sizeCanvas();
+		const idx = heldIdx ?? boilIndexAt(performance.now() / 1000);
+		drawBoil(boilZ(idx));
+		if (heldIdx === null) lastDrawnIdx = idx;
+	}
+	measure();
+	wrapper._boilMeasure = measure;
+	boilResize.observe(wrapper);
 	canvas._boilVisible = true;          // assume visible until the observer has seen it on screen
 	canvas._boilSeen = false;
 	boilVisibility.observe(canvas);
@@ -1532,18 +1458,17 @@ function initBoilingBorder(canvas, contentW, contentH, bottomExtension = 0) {
 	function drawBoil(tSec) {
 		ctx.clearRect(0, 0, cw, ch); ctx.save(); ctx.translate(P, P);
 		const path = boilBuildSmoothPath(boilDeformPath(basePath, tSec, seed));
-		ctx.fillStyle = '#ffffff'; ctx.fill(path);
-		ctx.strokeStyle = '#000000'; ctx.lineWidth = BOIL_CFG.strokeWidth; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+		ctx.fillStyle = CARD_SURFACE; ctx.fill(path);
+		ctx.strokeStyle = CARD_STROKE; ctx.lineWidth = BOIL_CFG.strokeWidth; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 		ctx.stroke(path);
 		ctx.restore();
 	}
-	let firstTs = 0, heldIdx = null, lastDrawnIdx = -1;
 	function tick(ts) {
-		// The card this canvas belonged to was removed (hideAfter, or the message
+		// The card this canvas belonged to was removed (deleted, or the message
 		// list pruning its top). Stop the loop and let it be collected — without
 		// this the border kept boiling into a detached canvas for the rest of the
 		// session, and every card ever shown left one behind.
-		if (!canvas.isConnected) { boilVisibility.unobserve(canvas); return; }
+		if (!canvas.isConnected) { boilVisibility.unobserve(canvas); boilResize.unobserve(wrapper); return; }
 		if (!canvas._boilVisible) {                       // scrolled out of the source
 			if (!culledAt) culledAt = ts;
 			else if (sized && ts - culledAt > BOIL_RELEASE_AFTER_MS) releaseCanvas();
@@ -1586,7 +1511,9 @@ function initBoilingBorder(canvas, contentW, contentH, bottomExtension = 0) {
    from when it appears. The old "…" (text-overflow: ellipsis) treatment is
    replaced by these scrolling windows.
    ════════════════════════════════════════════════════════════════ */
-const MQ = { speed: 50, fadePx: 8, pauseStart: 2000, easeMs: 650, smoothGap: 24, holdEnd: 900, fadeMs: 100, homeHold: 40 };
+// smoothGap / songFadePx are the music player's (the song card's lines scroll like it);
+// fadePx is the narrower names'.
+const MQ = { speed: 50, fadePx: 8, songFadePx: 12, pauseStart: 2000, easeMs: 650, smoothGap: 32, holdEnd: 900, fadeMs: 100, homeHold: 40 };
 const MQ_V_CRUISE = MQ.speed / 1000;              // px per ms cruise velocity
 const MQ_A_RAMP   = MQ_V_CRUISE / MQ.easeMs;      // px per ms² fixed accel/decel
 
@@ -1671,12 +1598,13 @@ function usernameMarquee(text, color) {
 // registered @property inside a CSS calc(): Chromium doesn't reliably repaint a
 // mask gradient when only the custom property changes, so on stacked cards all
 // but the first rendered a hard clip instead of the fade. The band width is a
-// fixed MQ.fadePx (px, not %) so it stays soft on the narrow ~80px name windows.
+// fixed m.fadePx (px, not %: MQ.fadePx on names, so it stays soft on the narrow
+// ~80px name windows, and the music player's MQ.songFadePx on song lines).
 function mqApplyFade(m, l, r) {
 	if (!m.fade) return;
 	let g = '';   // '' → no mask (no fade) when the line doesn't overflow
 	if (m.O > 0) {
-		const lp = (l * MQ.fadePx).toFixed(2), rp = (r * MQ.fadePx).toFixed(2);
+		const lp = (l * m.fadePx).toFixed(2), rp = (r * m.fadePx).toFixed(2);
 		g = `linear-gradient(90deg, transparent 0, #000 ${lp}px, #000 calc(100% - ${rp}px), transparent 100%)`;
 	}
 	if (g === m._mask) return;   // skip redundant style writes
@@ -1686,8 +1614,8 @@ function mqApplyFade(m, l, r) {
 }
 
 function mqSetEdgeFade(m, off) {   // off ≤ 0; grows the left / right fade with overflow
-	const l = m.O ? Math.min(1, (-off) / MQ.fadePx) : 0;
-	const r = m.O ? Math.min(1, (m.O + off) / MQ.fadePx) : 0;
+	const l = m.O ? Math.min(1, (-off) / m.fadePx) : 0;
+	const r = m.O ? Math.min(1, (m.O + off) / m.fadePx) : 0;
 	mqApplyFade(m, l, r);
 }
 
@@ -1716,7 +1644,7 @@ function mqTickSmooth(m, t) {
 	const off = tt < MQ.pauseStart ? 0 : -mqTravel(m.unit, tt - MQ.pauseStart);
 	mqSetTransform(m, off);
 	const d = Math.min(-off, m.unit + off);   // distance from the nearest home edge
-	mqApplyFade(m, Math.max(0, Math.min(1, d / MQ.fadePx)), 1);   // wrapped copy always overflows the right
+	mqApplyFade(m, Math.max(0, Math.min(1, d / m.fadePx)), 1);   // wrapped copy always overflows the right
 }
 
 function mqTickFadeswap(m, t) {
@@ -1809,13 +1737,27 @@ function allocateGiftRow(root) {
 // Discover every .mq in a freshly-added card, build its runtime object, measure
 // overflow, and start the card's shared clock. One timing group per card.
 function startCardMarquees(root) {
+	// Safe to run again on the same card (see AddMessageItem): its old runtime
+	// objects are dropped first, so a re-measure never doubles up.
+	for (let i = mqActive.length - 1; i >= 0; i--) if (root.contains(mqActive[i].win)) mqActive.splice(i, 1);
 	allocateGiftRow(root);   // share gift-name widths first, then measure overflow
-	const wins = root.querySelectorAll('.mq');
-	if (!wins.length) return;
+	// A song card's lines run on their own clock, as in the music player: rest, then
+	// each clipped line wraps once round, the longest setting the loop. The names on
+	// the card share the card's clock (scroll to the end, fade back to the start).
+	const all = [...root.querySelectorAll('.mq')];
+	const isSong = (w) => !!w.closest('.music-ui-container');
+	for (const wins of [all.filter(w => !isSong(w)), all.filter(isSong)]) if (wins.length) startMarqueeGroup(wins);
+	mqEnsureRunning();
+}
+
+// One timing group: its lines are measured once, and loop together.
+function startMarqueeGroup(wins) {
 	const group = { scrollDur: 0, fadeTail: 0, cycle: 4000, t0: performance.now(), ready: false };
 	let maxDist = 0, hasFade = false;
 	wins.forEach(win => {
-		const m = { win, inner: win.querySelector('.mq-inner'), fade: win.classList.contains('fade'), mode: win.dataset.mqMode || 'park', group, O: 0, unit: 0 };
+		const mode = win.dataset.mqMode || 'park';
+		const m = { win, inner: win.querySelector('.mq-inner'), fade: win.classList.contains('fade'), mode, group, O: 0, unit: 0,
+		            fadePx: mode === 'smooth' ? MQ.songFadePx : MQ.fadePx };
 		// clientWidth is the PADDING box, but the text is laid out from the CONTENT box,
 		// so a padded window (the outline needs one — see .contrast-outline .mq) has
 		// paddingLeft less room than clientWidth suggests. Without this the last few px
@@ -1841,7 +1783,6 @@ function startCardMarquees(root) {
 	group.fadeTail = hasFade ? (MQ.holdEnd + MQ.fadeMs + MQ.homeHold + MQ.fadeMs) : 0;
 	group.cycle = MQ.pauseStart + group.scrollDur + group.fadeTail;
 	group.ready = true;
-	mqEnsureRunning();
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -1901,7 +1842,6 @@ function writeInElement(el) {
 // The message bodies that get the reveal. Event-card headers ("Subscribed With
 // Tier 1") are left alone — they're short labels, not something being said.
 function writeInMessage(root) {
-	if (!writingAnimation) return;
 	writeInElement(root.querySelector('#message'));
 	writeInElement(root.querySelector('.featured-message-text'));
 	writeInElement(root.querySelector('.sub-comment-text'));
@@ -1913,7 +1853,8 @@ function writeInMessage(root) {
 // frame as the appear.
 function AddMessageItem(element, elementID, platform, userId, customClasses = [], onAdded = null, onMeasured = null) {
 	const tempContainer = document.createElement('div');
-	tempContainer.style.cssText = `position:absolute; visibility:hidden; width:${BASE_WIDTH}px; pointer-events:none;`;
+	// Measured at the list's own width (it fills the source, or the receipt).
+	tempContainer.style.cssText = `position:absolute; left:0; right:0; visibility:hidden; pointer-events:none;`;
 	
 	const tempLi = document.createElement('li');
 	tempLi.style.cssText = 'height:auto !important; transition:none !important; opacity:1 !important; display:block !important;';
@@ -1940,9 +1881,10 @@ function AddMessageItem(element, elementID, platform, userId, customClasses = []
 		lineItem.dataset.platform = platform;
 		lineItem.dataset.userId = userId;
 		customClasses.forEach(cls => lineItem.classList.add(cls));
-		
-		if (scrollDirection === 2) lineItem.classList.add('reverseLineItemDirection');
-		
+		// The settings preview's demo chat gives way to the first real message.
+		if (String(elementID).startsWith('demo-')) lineItem.classList.add('demo');
+		else if (previewMode) msgList.querySelectorAll('li.demo').forEach(li => li.remove());
+
 		while (tempLi.firstChild) {
 			lineItem.appendChild(tempLi.firstChild);
 		}
@@ -1954,11 +1896,22 @@ function AddMessageItem(element, elementID, platform, userId, customClasses = []
 			requestAnimationFrame(() => {
 				lineItem.classList.add("show");
 				lineItem.style.height = calculatedHeight;
+				// Once open, let the line size itself again, so a source resized later
+				// (the chat fills its width) reflows the text instead of clipping it.
+				lineItem.addEventListener('transitionend', function open(e) {
+					if (e.target !== lineItem || e.propertyName !== 'height') return;
+					lineItem.removeEventListener('transitionend', open);
+					lineItem.style.height = 'auto';
+					lineItem.classList.add('open');
+				});
 				if (onAdded) onAdded(lineItem);
 				// Every line, not just event cards: plain chat usernames are fade-scroll
 				// windows too, and they need measuring once they're in the real layout.
 				// startCardMarquees no-ops on a line that contains no .mq window.
 				startCardMarquees(lineItem);
+				// A face still loading (the first 700 or 600 text after the source
+				// starts) measures in the fallback font: measure again once it's in.
+				if (document.fonts.status !== 'loaded') document.fonts.ready.then(() => startCardMarquees(lineItem));
 				// Split the body into words on the same frame the line starts opening,
 				// so both animations run off one clock. After the marquees, so their
 				// widths are measured on untouched markup.
@@ -1971,17 +1924,6 @@ function AddMessageItem(element, elementID, platform, userId, customClasses = []
 			else break;
 		}
 
-		if (hideAfter > 0) {
-			setTimeout(() => {
-				lineItem.style.opacity = 0;
-				lineItem.style.height = 0;
-				lineItem.style.paddingTop = 0;
-				lineItem.style.paddingBottom = 0;
-				lineItem.style.marginTop = 0;
-				lineItem.style.marginBottom = 0;
-				setTimeout(() => lineItem.remove(), 400); 
-			}, hideAfter * 1000);
-		}
 	}, 50);
 }
 
@@ -1998,14 +1940,15 @@ function AddSubCardItem(element, elementID, platform, userId) {
 		const tryInitBorder = (canvas, wrapper, extension, retries = 5) => {
 			if (!canvas || !wrapper) return;
 			const w = wrapper.offsetWidth, h = wrapper.offsetHeight;
-			if (w > 0 && h > 0) initBoilingBorder(canvas, w, h, extension);
+			if (w > 0 && h > 0) initBoilingBorder(canvas, wrapper, extension);
 			else if (retries > 0) setTimeout(() => tryInitBorder(canvas, wrapper, extension, retries - 1), 50);
 		};
 
 		const mainCanvas = li.querySelector('.sub-border-canvas');
 		const mainWrapper = li.querySelector('.sub-card-wrapper');
 		const commentWrapperEl = li.querySelector('.sub-comment-wrapper');
-		const extension = (commentWrapperEl && commentWrapperEl.style.display !== 'none') ? 26 : 0;
+		// With an attachment the header runs 32px on under it (Figma's -32px overlap).
+		const extension = (commentWrapperEl && commentWrapperEl.style.display !== 'none') ? 32 : 0;
 		tryInitBorder(mainCanvas, mainWrapper, extension);
 
 		const commentCanvas = li.querySelector('.sub-comment-border-canvas');
@@ -2622,3 +2565,34 @@ async function GetSongInfo(request) {
 	);
 	return info;
 }
+
+/* ══ Settings preview: a demo chat ═══════════════════════════════════════════
+   The settings page shows this overlay with ?preview. Until a real message comes
+   in (Streamer.bot closed, or just a quiet chat) it shows the comp's chat: a sub,
+   a cheer, a song request and two messages, everyone a gray circle — each only
+   when its kind is switched on, as a real one would be. The first real message
+   clears it (see AddMessageItem). */
+async function ShowDemoChat() {
+	const gray = cardTokens.getPropertyValue('--gray-200').trim() || '#DEDEDE';
+	const avatar = 'data:image/svg+xml,' + encodeURIComponent(
+		`<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><circle cx='16' cy='16' r='16' fill='${gray}'/></svg>`);
+	avatarMap.set('username', avatar);   // chat lines look avatars up by login
+	const user = { id: 'demo-user', name: 'Username', login: 'username', color: '#9146FF', profileImageUrl: avatar };
+	const chat = (id, text) => TwitchChatMessage({
+		user: { id: user.id, login: user.login, name: user.name },
+		message: { msgId: id, message: text, displayName: user.name, username: user.login, userId: user.id,
+		           color: user.color, badges: [], role: 1, isReply: false, isMe: false, firstMessage: false },
+		emotes: [],
+	});
+	if (showTwitchSubs) await renderEventCard({ user, subTier: '1000', messageId: 'demo-sub' }, 'sub', 'twitch');
+	if (showTwitchCheers) await renderEventCard({ user, bits: 100, text: '', messageId: 'demo-cheer' }, 'cheer', 'twitch', {
+		description: EvGroup('bit-purple', 'Cheered 100', true), icon: 'bit-jar-purple' });
+	if (showTwitchMessages) await chat('demo-chat-1', 'btw cafe what sensitivity do you play on?');
+	if (showTwitchChannelPoints) await renderEventCard({ user, text: '', messageId: 'demo-song' }, 'channelpoint', 'twitch', {
+		description: ChannelPointDescription('Song Request', 300),
+		// The Song Info Card's song
+		htmlContent: SongCardHTML({ title: 'Big Iron', album: 'Gunfighter Ballads And Trail Songs', artist: 'Marty Robbins',
+		                            durationMs: 235000, albumArt: 'assets/default-album-art.png' }) });
+	if (showTwitchMessages) await chat('demo-chat-2', 'man this game just looks amazing coming after a while');
+}
+if (previewMode) ShowDemoChat();

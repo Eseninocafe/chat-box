@@ -1,335 +1,170 @@
 {
 	"settings": [
 		{
-			"id": "showPlatform",
-			"label": "Show Platform",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Appearance"
-		},
-		{
-			"id": "showAvatar",
-			"label": "Show Avatar",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Appearance"
-		},
-		{
-			"id": "showTimestamps",
-			"label": "Show Timestamps",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Appearance"
-		},
-		{
-			"id": "showBadges",
-			"label": "Show Badges",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Appearance"
-		},
-		{
-			"id": "showUsername",
-			"label": "Show Username",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Appearance"
-		},
-		{
-			"id": "showMessage",
-			"label": "Show Message",
-			"description": "Honestly, if you turn this off, you're stupid lmao",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Appearance"
-		},
-		{
-			"id": "showTopGradient",
-			"label": "Show Top Gradient",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Appearance"
-		},
-		{
-			"id": "writingAnimation",
-			"label": "Writing Animation",
-			"description": "Messages reveal word by word as they arrive. Turn off if the streaming machine is struggling.",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Appearance"
-		},
-		{
-			"id": "font",
-			"label": "Font",
-			"description": "",
-			"type": "text",
-			"defaultValue": "",
-			"group": "Appearance"
-		},
-		{
-			"id": "fontSize",
-			"label": "Font Size",
-			"description": "",
-			"type": "number",
-			"min": 1,
-			"max": 120,
-			"defaultValue": 18,
-			"group": "Appearance"
-		},
-		{
-			"id": "fontColor",
-			"label": "Text Color",
-			"description": "Color for regular text that isn't platform colored",
-			"type": "color",
-			"defaultValue": "#000000",
-			"group": "Appearance"
-		},
-		{
-			"id": "contrastOutline",
-			"label": "Contrast Outline",
-			"description": "Adds a 1px outline to text and usernames for readability",
+			"id": "receipt",
+			"label": "Receipt",
+			"description": "Encases chat box in a receipt",
 			"type": "checkbox",
 			"defaultValue": false,
-			"group": "Appearance"
-		},
-		{
-			"id": "background",
-			"label": "Background",
-			"description": "",
-			"type": "color",
-			"defaultValue": "#ffffff",
-			"group": "Appearance"
-		},
-		{
-			"id": "backgroundOpacity",
-			"label": "Background Opacity",
-			"description": "0 = fully transparent, 100 = fully opaque",
-			"type": "number",
-			"min": 0,
-			"max": 100,
-			"defaultValue": 100,
-			"group": "Appearance"
-		},
-		{
-			"id": "hideAfter",
-			"label": "Hide After",
-			"description": "Messages fade after X seconds (0 to disable)",
-			"type": "number",
-			"min": 0,
-			"max": 120,
-			"defaultValue": 0,
-			"group": "General"
-		},
-		{
-			"id": "excludeCommands",
-			"label": "Exclude Commands",
-			"description": "Hide messages starting with \"!\"",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "General"
-		},
-		{
-			"id": "ignoreChatters",
-			"label": "Ignore Chatters",
-			"description": "Ignored chatters will not be shown",
-			"type": "text",
-			"defaultValue": "StreamElements,Streamlabs",
-			"group": "General"
-		},
-		{
-			"id": "scrollDirection",
-			"label": "Scroll Direction",
-			"description": "",
-			"type": "select",
-			"options": [
-				{
-					"value": 1,
-					"label": "Normal"
-				},
-				{
-					"value": 2,
-					"label": "Reversed"
-				}
-			],
-			"defaultValue": 1,
-			"group": "General"
-		},
-		{
-			"id": "imageEmbedPermissionLevel",
-			"label": "Embed Images",
-			"description": "Automatically embed images for these users",
-			"type": "select",
-			"options": [
-				{
-					"value": 40,
-					"label": "Broadcaster"
-				},
-				{
-					"value": 30,
-					"label": "Mods & Broadcaster"
-				},
-				{
-					"value": 20,
-					"label": "VIPs, Mods & Broadcaster"
-				},
-				{
-					"value": 15,
-					"label": "Subs, VIPs, Mods & Broadcaster"
-				},
-				{
-					"value": 10,
-					"label": "Everyone"
-				},
-				{
-					"value": 69420,
-					"label": "Nobody"
-				}
-			],
-			"defaultValue": 20,
-			"group": "General"
-		},
-		{
-			"id": "showTwitchMessages",
-			"label": "Chat Messages",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Which Twitch messages do you want to see?"
-		},
-		{
-			"id": "showTwitchAnnouncements",
-			"label": "Announcements",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Which Twitch messages do you want to see?"
-		},
-		{
-			"id": "showTwitchSubs",
-			"label": "New Subscribers",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Which Twitch messages do you want to see?"
-		},
-		{
-			"id": "showTwitchRaids",
-			"label": "Raids",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Which Twitch messages do you want to see?"
-		},
-		{
-			"id": "showTwitchFollows",
-			"label": "New Followers",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Which Twitch messages do you want to see?"
-		},
-		{
-			"id": "showTwitchCheers",
-			"label": "Cheers / Bits",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Which Twitch messages do you want to see?"
-		},
-		{
-			"id": "showTwitchChannelPoints",
-			"label": "Channel Point Redemptions",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Which Twitch messages do you want to see?"
-		},
-		{
-			"id": "showTwitchPowerUps",
-			"label": "Power-Ups (Bits)",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Which Twitch messages do you want to see?"
-		},
-		{
-			"id": "showTwitchWatchStreaks",
-			"label": "Watch Streaks",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Which Twitch messages do you want to see?"
-		},
-		{
-			"id": "showYouTubeMessages",
-			"label": "Chat Messages",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Which YouTube messages do you want to see?"
-		},
-		{
-			"id": "showYouTubeSuperChats",
-			"label": "Super Chats",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Which YouTube messages do you want to see?"
-		},
-		{
-			"id": "showYouTubeMemberships",
-			"label": "Memberships",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Which YouTube messages do you want to see?"
-		},
-		{
-			"id": "showStreamlabsDonations",
-			"label": "Streamlabs Tips",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Which donation messages do you want to see?"
-		},
-		{
-			"id": "showStreamElementsTips",
-			"label": "StreamElements Tips",
-			"description": "",
-			"type": "checkbox",
-			"defaultValue": true,
-			"group": "Which donation messages do you want to see?"
+			"omitWhenDefault": true,
+			"group": ""
 		},
 		{
 			"id": "stingers",
 			"label": "Enable Stingers",
-			"description": "Fade the chat out for the stinger overlay on subs & cheers, then fade back in and show the alert. Requires the separate stinger browser source added on top. Only added to the URL when on.",
+			"description": "Chat will fade out for stinger",
 			"type": "checkbox",
 			"defaultValue": false,
 			"omitWhenDefault": true,
-			"group": "Stingers"
+			"hideWhen": "receipt",
+			"group": ""
 		},
 		{
-			"id": "address",
-			"label": "Address",
-			"description": "Streamer.bot Websocket Server Address",
-			"type": "text",
-			"defaultValue": "127.0.0.1",
-			"group": "Advanced"
+			"id": "showPlatform",
+			"label": "Show Platform",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "Show in messages"
 		},
 		{
-			"id": "port",
-			"label": "Port",
-			"description": "Streamer.bot Websocket Server Port",
+			"id": "showAvatar",
+			"label": "Show Avatar",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "Show in messages"
+		},
+		{
+			"id": "showTimestamps",
+			"label": "Show Timestamps",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "Show in messages"
+		},
+		{
+			"id": "showBadges",
+			"label": "Show Badges",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "Show in messages"
+		},
+		{
+			"id": "showUsername",
+			"label": "Show Username",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "Show in messages"
+		},
+		{
+			"id": "ignoreChatters",
 			"type": "text",
-			"defaultValue": "8080",
-			"group": "Advanced"
+			"placeholder": "Usernames, comma separated",
+			"defaultValue": "StreamElements,Streamlabs",
+			"group": "Exclude commands from"
+		},
+		{
+			"id": "imageEmbedPermissionLevel",
+			"type": "select",
+			"options": [
+				{ "value": 40, "label": "Broadcaster" },
+				{ "value": 30, "label": "Mods & Broadcaster" },
+				{ "value": 20, "label": "VIPs, Mods & Broadcaster" },
+				{ "value": 15, "label": "Subs, VIPs, Mods & Broadcaster" },
+				{ "value": 10, "label": "Everyone" },
+				{ "value": 69420, "label": "Nobody" }
+			],
+			"defaultValue": 20,
+			"group": "Embed images from"
+		},
+		{
+			"id": "showTwitchMessages",
+			"label": "Chat Messages",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "Twitch messages"
+		},
+		{
+			"id": "showTwitchAnnouncements",
+			"label": "Announcements",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "Twitch messages"
+		},
+		{
+			"id": "showTwitchSubs",
+			"label": "New Subscribers",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "Twitch messages"
+		},
+		{
+			"id": "showTwitchRaids",
+			"label": "Raids",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "Twitch messages"
+		},
+		{
+			"id": "showTwitchFollows",
+			"label": "New Followers",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "Twitch messages"
+		},
+		{
+			"id": "showTwitchCheers",
+			"label": "Cheers / Bits",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "Twitch messages"
+		},
+		{
+			"id": "showTwitchChannelPoints",
+			"label": "Channel Point Redemptions",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "Twitch messages"
+		},
+		{
+			"id": "showTwitchWatchStreaks",
+			"label": "Watch Streaks",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "Twitch messages"
+		},
+		{
+			"id": "showYouTubeMessages",
+			"label": "Chat Messages",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "YouTube messages"
+		},
+		{
+			"id": "showYouTubeSuperChats",
+			"label": "Super Chats",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "YouTube messages"
+		},
+		{
+			"id": "showYouTubeMemberships",
+			"label": "Memberships",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "YouTube messages"
+		},
+		{
+			"id": "showStreamlabsDonations",
+			"label": "Streamlabs Tips",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "Donation messages"
+		},
+		{
+			"id": "showStreamElementsTips",
+			"label": "StreamElements Tips",
+			"type": "checkbox",
+			"defaultValue": true,
+			"group": "Donation messages"
 		}
 	]
 }
