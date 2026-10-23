@@ -686,3 +686,26 @@ body.compact .sub-event-container[data-type="channelpoint"] .sub-description { d
 	min-width: 0;
 }
 .sub-comment-text { display: block; }
+
+/* Streamer.bot connection label: bottom centre, 24px up. Figma's 8px stroke is
+   centred on the frame, so half of it eats into the 14px padding and the other half
+   hangs 4px outside: the frame is 24px up, so the border box is 20px. Its 16px
+   radius is on that centre line too, so the outer edge is 20 (and the inside 12). */
+#connectionLabel {
+	position: fixed;
+	left: 50%;
+	bottom: 20px;
+	transform: translateX(-50%);
+	z-index: 2;
+	padding: 10px;
+	background: var(--white);
+	border: 8px solid var(--black);
+	border-radius: 20px;
+	font-size: 24px;
+	line-height: 29px;
+	font-weight: 600;
+	color: var(--black);
+	white-space: nowrap;
+	transition: opacity 350ms ease;
+}
+#connectionLabel.hidden { opacity: 0; }

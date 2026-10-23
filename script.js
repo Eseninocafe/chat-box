@@ -334,10 +334,18 @@ function GetPlatformColor(platform) {
 // Platforms that have an icon in assets/icons/*/platforms/. Others skip the platform badge.
 const PLATFORMS_WITH_ICONS = new Set(['twitch', 'youtube']);
 
-// No status label on the overlay itself: the settings page's preview shows a
-// "Connected" pill instead, so the state is handed up to it.
+// The label at the bottom: NOT CONNECTED until Streamer.bot connects, then CONNECTED
+// for a moment before it fades. The settings page's preview has its own "Connected"
+// pill, so there the label is dropped and the state is only handed up.
+const connectionLabel = document.getElementById('connectionLabel');
+if (previewMode) connectionLabel.remove();
+let connectionHideTimer = 0;
 function SetConnectionStatus(connected) {
 	if (window.parent !== window) window.parent.postMessage({ chatbox: connected ? 'connected' : 'disconnected' }, '*');
+	clearTimeout(connectionHideTimer);
+	connectionLabel.textContent = connected ? 'CONNECTED' : 'NOT CONNECTED';
+	connectionLabel.classList.remove('hidden');
+	if (connected) connectionHideTimer = setTimeout(() => connectionLabel.classList.add('hidden'), 2000);
 }
 
 // Usernames keep their own colour everywhere so cards and chat look identical

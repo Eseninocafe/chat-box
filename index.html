@@ -10,7 +10,7 @@
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@4.5.15/500.css">
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@4.5.15/600.css">
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@4.5.15/700.css">
-	<link rel="stylesheet" href="./style.css?v=7" />
+	<link rel="stylesheet" href="./style.css?v=10" />
 	<script type="text/javascript" src="https://unpkg.com/@streamerbot/client/dist/streamerbot-client.js"></script>
 </head>
 
@@ -23,6 +23,9 @@
 			<ul id="messageList"></ul>
 		</div>
 	</div>
+
+	<!-- Streamer.bot connection: NOT CONNECTED until it connects, then CONNECTED and gone. -->
+	<div id="connectionLabel">NOT CONNECTED</div>
 
 	<template id="messageTemplate">
 		<div id="messageContainer">
@@ -125,7 +128,7 @@
 		</div>
 	</template>
 
-	<script src="./script.js?v=7"></script>
+	<script src="./script.js?v=8"></script>
 </body>
 
 </html>
