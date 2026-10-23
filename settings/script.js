@@ -154,8 +154,9 @@ function makeControl(s) {
 }
 
 // Read the URL pasted in the header and apply any settings it contains. Anything
-// that isn't one says so in the field's placeholder.
+// that isn't one says so in the field's placeholder for a moment, like "Copied".
 const LOAD_PLACEHOLDER = 'Paste widget URL';
+let loadPlaceholderTimer = 0;
 function loadFromUrlInput() {
     const input = $('loadInput');
     const raw = input.value.trim();
@@ -168,7 +169,12 @@ function loadFromUrlInput() {
     } catch (e) {}
 
     const known = params ? settings.filter(s => params.has(s.id)) : [];
-    if (!known.length) { input.placeholder = 'Not a widget URL'; return; }
+    clearTimeout(loadPlaceholderTimer);
+    if (!known.length) {
+        input.placeholder = 'Not a widget URL';
+        loadPlaceholderTimer = setTimeout(() => { input.placeholder = LOAD_PLACEHOLDER; }, 1500);
+        return;
+    }
     input.placeholder = LOAD_PLACEHOLDER;
     // Settings missing from the URL are at their defaults there.
     settings.forEach(s => {
