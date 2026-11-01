@@ -154,8 +154,9 @@ const showStreamElementsTips = GetBooleanParam("showStreamElementsTips", true);
    A custom property resolves the var()s inside its OWN value at the element where it
    is declared — so the copy on :root bakes in root's black before it ever inherits.
    Re-declaring this same string on a username element makes it resolve against that
-   element's --o-colour instead, which is how a name gets a 3D in its own ink. */
-let _oTextExtrudeTemplate = '';
+   element's --o-colour instead, which is how a name gets a 3D in its own ink. The
+   avatar's rings and the platform icon's extrude are kept the same way, for their inks. */
+let _oTextExtrudeTemplate = '', _oAvatarShadowTemplate = '', _oPlatExtrudeTemplate = '';
 
 if (contrastOutline) {
 
@@ -163,11 +164,16 @@ if (contrastOutline) {
 	   Behind ?contrastOutline, and chat messages only; the bordered cards have their
 	   own solid backgrounds and are untouched.
 
-	   Four techniques, because four different kinds of shape:
+	   Five techniques, because five different kinds of shape:
 	     text / usernames   16-copy text-shadow ring, then a filter extrude
 	     reply arrow + line  one inline SVG drawing the path twice (wide dark, then light)
-	     badges + platform   one SVG filter: blur SourceAlpha, threshold it, merge
+	     platform icons      their own *-outline.svg: a mitered stroke under the logo
+	     badges              one SVG filter: blur SourceAlpha, threshold it, merge
 	     avatars             box-shadow rings (a disc IS its border box)
+
+	   Names, avatars and platform icons are outlined in their own ink (usernameInk:
+	   their colour taken right down) rather than OUTLINE.colour; see TintAvatarOutline
+	   and ChatPlatformIcon.
 
 	   Two rasteriser facts drive the whole design:
 
@@ -219,9 +225,11 @@ if (contrastOutline) {
 		// avatar: a ring plus three offset rings, unioned. box-shadows are all drawn from
 		// the element rather than chained, so they keep sub-pixel precision.
 		const step = _oDepth * OUTLINE.avScale / 3, dx = OUTLINE.dirX, dy = OUTLINE.dirY;
+		const ink = `var(--o-colour, ${OUTLINE.colour})`;
 		const rings = [1, 2, 3].map(k =>
-			`${(dx * step * k).toFixed(3)}px ${(dy * step * k).toFixed(3)}px 0 var(--o-hr) ${OUTLINE.colour}`);
-		_oRoot.setProperty('--o-avatar-shadow', `0 0 0 var(--o-hr) ${OUTLINE.colour}, ` + rings.join(', '));
+			`${(dx * step * k).toFixed(3)}px ${(dy * step * k).toFixed(3)}px 0 var(--o-hr) ${ink}`);
+		_oAvatarShadowTemplate = `0 0 0 var(--o-hr) ${ink}, ` + rings.join(', ');
+		_oRoot.setProperty('--o-avatar-shadow', _oAvatarShadowTemplate);
 	}
 
 	/* Badges and platform icons are <img>: no text-shadow, no SVG stroke, and a
@@ -246,7 +254,13 @@ if (contrastOutline) {
 
 	   Being a filter rather than a mask, this also needs no second fetch of the icon,
 	   so it survives a tainted canvas and works on file:// — the two cases the mask
-	   path had to carve out. */
+	   path had to carve out.
+
+	   Not the platform icons: a dilation of any kind can't keep a logo's sharp corners
+	   AND an even edge at 22px (round melts Twitch's corners into a blob, a square is
+	   1.4x thick on its 45-degree cuts, a cross notches its right angles). They're
+	   vectors, so they carry a real mitered stroke instead (*-outline.svg) and only
+	   take the extrude from here. */
 	{
 		const P = 0.15;                          // threshold level -> dilation distance
 		const sigma = _oHr / 1.0365;
@@ -274,6 +288,8 @@ if (contrastOutline) {
 
 		const ex = BuildExtrudeFilter(_oDepth * OUTLINE.imgScale);
 		_oRoot.setProperty('--o-img-outline', 'url(#o-icon-outline)' + (ex === 'none' ? '' : ' ' + ex));
+		_oPlatExtrudeTemplate = ex;
+		_oRoot.setProperty('--o-plat-extrude', ex);
 	}
 
 }   // end if (contrastOutline)
@@ -359,13 +375,15 @@ function SetConnectionStatus(connected) {
 const USERNAME_LUM_MAX = 0.30;         // no outline, so on white (receipt, cards): 3:1 against it
 const USERNAME_LUM_MAX_OUTLINE = 0.65; // gentler cap when the outline is on (less darkening)
 const USERNAME_LUM_MIN = 0.04;         // names darker than this get lightened up to it
-const USERNAME_LUM_MIN_OUTLINE = 0.05; // higher floor when the outline is on (a bit lighter)
-const USERNAME_INK_KEEP = 0.91;        // measured: what the tinted ring leaves of the colour
-const USERNAME_INK_SCALE = 0.25;       // outline ink = the name's own colour, this much of it
+const USERNAME_LUM_MIN_OUTLINE = 0.12; // higher floor when the outline is on: a name sits on its
+                                       // own dark ink, so black needs lifting to grey 112 to read
+const USERNAME_INK_KEEP = 0.90;        // what the tinted ring leaves of the colour (see below)
+const USERNAME_INK_SCALE = 0.15;       // outline ink = the name's own colour, this much of it
 /* The outline ring is painted BEHIND the glyph, so the antialiased edges blend into it
    and the eye integrates a slightly darker colour than the nominal one — at chat size
    more than half the glyph is edge. Measured over the glyph's own coverage (halo
-   excluded): a black ring keeps 87.8% of the colour, a 0.25x tinted ring 90.9%.
+   excluded): a black ring keeps 87.8% of the colour, a 0.25x tinted ring 90.9%, so
+   the 0.15x ring sits at about 90%.
 
    The band is about what you SEE, so `keep` folds that loss into the comparison: the
    colour is judged as it lands on screen, not as it arrives. With the outline off it
@@ -822,7 +840,7 @@ async function TwitchChatMessage(data) {
 	messageDiv.innerHTML = linkify(messageDiv.innerHTML);
 	if (data.message.isMe) messageDiv.style.color = data.message.color;
 
-	if (showPlatform) instance.querySelector("#platform").innerHTML = iconImg('platforms/twitch', 'platform');
+	if (showPlatform) ChatPlatformIcon(instance.querySelector("#platform"), 'twitch');
 
 	if (showBadges) {
 		const badgeListDiv = instance.querySelector("#badgeList");
@@ -850,6 +868,7 @@ async function TwitchChatMessage(data) {
 	if (showAvatar) {
 		const avatarURL = await GetAvatar(data.message.username, null, 'twitch');
 		instance.querySelector("#avatar").innerHTML = `<img src="${avatarURL}" class="avatar">`;
+		TintAvatarOutline(instance.querySelector("#avatar img"), avatarURL);
 	}
 
 	const messageText = data.message.message;
@@ -1214,7 +1233,7 @@ async function YouTubeMessage(data) {
 	messageDiv.innerHTML = messageDiv.innerHTML.replace(/(^|\s)(@[^\s<]+)/g, `$1<span style="font-weight: bold; color: #FF0000;">$2</span>`);
 	messageDiv.innerHTML = linkify(messageDiv.innerHTML);
 
-	if (showPlatform) instance.querySelector("#platform").innerHTML = iconImg('platforms/youtube', 'platform');
+	if (showPlatform) ChatPlatformIcon(instance.querySelector("#platform"), 'youtube');
 
 	if (showBadges) {
 		// YouTube roles in Twitch's badge art: owner, mod (sword), member (star). Verified has none.
@@ -1229,6 +1248,7 @@ async function YouTubeMessage(data) {
 	if (showAvatar) {
 		const avatarURL = await GetAvatar(data.user.name, data.user.profileImageUrl, 'youtube');
 		instance.querySelector("#avatar").innerHTML = `<img src="${avatarURL}" class="avatar">`;
+		TintAvatarOutline(instance.querySelector("#avatar img"), avatarURL);
 	}
 
 	const messageText = data.message;
@@ -1594,6 +1614,50 @@ function usernameInk(color) {
 	}
 	const k = USERNAME_INK_SCALE;
 	return `rgb(${Math.round(r*k)}, ${Math.round(g*k)}, ${Math.round(b*k)})`;
+}
+
+/* A chat line's platform icon. With the outline on it's the *-outline.svg, whose stroke
+   is already in the logo's ink (baked in, as an <img> can't be restyled); the extrude
+   gets the same ink here, re-declared like a name's. */
+function ChatPlatformIcon(el, platform) {
+	el.innerHTML = iconImg(`platforms/${platform}${contrastOutline ? '-outline' : ''}`, 'platform');
+	if (!contrastOutline) return;
+	el.firstChild.style.setProperty('--o-colour', usernameInk(GetPlatformColor(platform)));
+	el.firstChild.style.setProperty('--o-plat-extrude', _oPlatExtrudeTemplate);
+}
+
+/* An avatar's ring and extrude in its own ink: the picture's average colour, taken down
+   like a name's. Read off a 16px canvas, which needs the image host to allow CORS —
+   Twitch's CDN does; one that doesn't leaves that ring black. Once per picture. */
+const avatarInks = new Map();   // url -> Promise<ink, or null>
+function TintAvatarOutline(img, url) {
+	if (!contrastOutline) return;
+	if (!avatarInks.has(url)) avatarInks.set(url, new Promise(resolve => {
+		const pic = new Image();
+		pic.crossOrigin = 'anonymous';
+		pic.onload = () => {
+			try {
+				const c = document.createElement('canvas');
+				c.width = c.height = 16;
+				const x = c.getContext('2d');
+				x.drawImage(pic, 0, 0, 16, 16);
+				const d = x.getImageData(0, 0, 16, 16).data;
+				let r = 0, g = 0, b = 0, n = 0;
+				for (let i = 0; i < d.length; i += 4) {
+					if (d[i + 3] < 128) continue;   // a transparent corner isn't the picture
+					r += d[i]; g += d[i + 1]; b += d[i + 2]; n++;
+				}
+				resolve(n ? usernameInk(`rgb(${r / n}, ${g / n}, ${b / n})`) : null);
+			} catch { resolve(null); }   // no CORS: the canvas is tainted
+		};
+		pic.onerror = () => resolve(null);
+		pic.src = url;
+	}));
+	avatarInks.get(url).then(ink => {
+		if (!ink) return;
+		img.style.setProperty('--o-colour', ink);
+		img.style.setProperty('--o-avatar-shadow', _oAvatarShadowTemplate);
+	});
 }
 
 function usernameMarquee(text, color) {

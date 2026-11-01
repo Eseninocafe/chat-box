@@ -635,11 +635,20 @@ body.compact .sub-event-container[data-type="channelpoint"] .sub-description { d
 	filter: var(--o-text-extrude, none);
 }
 
-/* Badges and the platform icon: one SVG filter draws the outline and the chained
-   drop-shadow sweeps it down. No wrapper element and no per-icon JS — see script.js. */
-.contrast-outline #messageContainer #badgeList img,
-.contrast-outline #messageContainer #platform img {
+/* Badges: one SVG filter draws the outline and the chained drop-shadow sweeps it
+   down. No wrapper element and no per-icon JS — see script.js. */
+.contrast-outline #messageContainer #badgeList img {
 	filter: var(--o-img-outline, none);
+}
+/* The platform icon is its *-outline.svg here, which carries its own stroke (in the
+   logo's ink; ChatPlatformIcon inks the extrude to match) in a box padded 5px a side
+   (room for the point on Twitch's tail): the margin takes that back so the logo sits
+   where it always did. */
+.contrast-outline #messageContainer #platform img {
+	width: calc(var(--plat-w) + 10px);
+	height: calc(var(--plat-h) + 10px);
+	margin: -5px;
+	filter: var(--o-plat-extrude, none);
 }
 
 /* Avatars: a full-bleed disc IS its border box, so a spread box-shadow traces it
