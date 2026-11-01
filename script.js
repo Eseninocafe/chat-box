@@ -1,5 +1,7 @@
 const dpr = window.devicePixelRatio || 1;
-const queryString = window.location.search;
+// "/?preview" on the end of any widget URL shows the preview, even after the
+// settings' own "?…" (where it would otherwise be read into the last setting).
+const queryString = window.location.search.replace(/\/?\?preview$/, '&preview');
 const urlParams = new URLSearchParams(queryString);
 
 // Streamer.bot's websocket. It has no setting any more; an address or port from an
@@ -2041,18 +2043,18 @@ function AddSubCardItem(element, elementID, platform, userId) {
 }
 
 function GetBooleanParam(paramName, defaultValue) {
-	const val = new URLSearchParams(window.location.search).get(paramName);
+	const val = urlParams.get(paramName);
 	if (val === null) return defaultValue;
 	return val.toLowerCase() === 'true';
 }
 
 function GetIntParam(paramName) {
-	const val = parseInt(new URLSearchParams(window.location.search).get(paramName), 10);
+	const val = parseInt(urlParams.get(paramName), 10);
 	return isNaN(val) ? null : val;
 }
 
 function GetFloatParam(paramName) {
-	const val = parseFloat(new URLSearchParams(window.location.search).get(paramName));
+	const val = parseFloat(urlParams.get(paramName));
 	return isNaN(val) ? null : val;
 }
 
