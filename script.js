@@ -937,7 +937,7 @@ const STINGER_SYNC = {
   noteTailMs:     850,  // the last note lingers after the last gem lands
   jarIdleMs:      800,  // the jar/sub holds this long before it starts fading out
   maxThrows:      40,   // the jar clamps a cheer to this many throws
-  subFrames:      { compact: 65, normal: 147 },   // normal: a 5.88s webm
+  subFrames:      { compact: 65, normal: 146 },   // normal: a 5.84s webm (frames 0-145)
   // raid bell: intro frames, then the click loop once per raider (max raidMaxClicks).
   // compact: the Blender intro; normal: the 400ms fade-in on the resting bell
   raidIntroFrames: { compact: 35, normal: 10 },
