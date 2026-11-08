@@ -15,21 +15,12 @@ function getParentUrl() {
     return urlParts.join('/') + '/';
 }
 
-// A setting with hideWhen is hidden, and left out of the URL, while that other
-// setting is on (Enable Stingers while Receipt is on). Its value is kept for
-// when it comes back.
-const isHidden = (s) => !!s.hideWhen && String(values[s.hideWhen]) === 'true';
-function applyHidden() {
-    settings.forEach(s => { if (s.row) s.row.hidden = isHidden(s); });
-}
-
 function buildQueryString() {
     return settings
         // Settings flagged omitWhenDefault are left out of the URL while at their
         // default, so links stay backward-compatible (e.g. ?stingers is only added
         // once it's turned on).
         .filter(s => !(s.omitWhenDefault && String(values[s.id]) === String(s.defaultValue)))
-        .filter(s => !isHidden(s))
         .map(s => `${encodeURIComponent(s.id)}=${encodeURIComponent(values[s.id])}`)
         .join('&');
 }
@@ -41,7 +32,6 @@ function getWidgetUrl() {
 // The preview is the chat box itself (?preview: a demo chat until a real message
 // comes in, and it reports its Streamer.bot connection for the pill).
 function updateWidget() {
-    applyHidden();
     $('widget').src = `../index.html?${buildQueryString()}&preview`;
     fitPreview();
 }
@@ -114,7 +104,6 @@ function makeToggle(s) {
     input.addEventListener('change', () => { values[s.id] = input.checked; updateWidget(); });
     controlSetters[s.id] = v => { input.checked = (v === true || String(v).toLowerCase() === 'true'); };
     row.append(text, toggle);
-    s.row = row;
     return row;
 }
 

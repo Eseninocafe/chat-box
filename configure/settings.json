@@ -12,11 +12,10 @@
 		{
 			"id": "stingers",
 			"label": "Enable Stingers",
-			"description": "Chat will fade out for stinger",
+			"description": "Chat will fade out and wait for stinger",
 			"type": "checkbox",
 			"defaultValue": false,
 			"omitWhenDefault": true,
-			"hideWhen": "receipt",
 			"group": ""
 		},
 		{

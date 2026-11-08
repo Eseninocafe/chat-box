@@ -103,12 +103,13 @@ const showTwitchCheers = GetBooleanParam("showTwitchCheers", true);
 const showTwitchChannelPoints = GetBooleanParam("showTwitchChannelPoints", true);
 const showTwitchWatchStreaks = GetBooleanParam("showTwitchWatchStreaks", true);
 
-// Stinger sync: when ON, a Twitch sub/resub/gift/bomb or cheer fades the chat out,
+// Stinger sync: when ON, a Twitch sub/resub/gift/bomb, cheer, raid, a donation/tip, or a YouTube
+// Super Chat, membership or gifted membership fades the chat out,
 // lets the separate stinger browser source play, then fades the chat back in and
 // only THEN shows the alert card. Default OFF so existing links (no ?stingers) are
 // unchanged — the settings page only appends ?stingers=true when it's enabled.
-// Never with the receipt (the settings page hides the option then, too).
-const stingersEnabled = GetBooleanParam("stingers", false) && !receipt;
+// With the receipt the chat stays put: the alert card just waits for the stinger.
+const stingersEnabled = GetBooleanParam("stingers", false);
 
 const showYouTubeMessages = GetBooleanParam("showYouTubeMessages", true);
 const showYouTubeSuperChats = GetBooleanParam("showYouTubeSuperChats", true);
@@ -908,29 +909,48 @@ async function TwitchChatMessage(data) {
 
    On a triggering event this source: fades the chat out, holds the alert card,
    waits out the stinger, fades the chat back in, then renders the held card.
+   With the receipt the chat doesn't fade: the card is held and pops in at the
+   same moment it would without the receipt.
 
    The hidden window is NOT fixed — stingerContentMs() computes how long the
    stinger actually needs for this event (a cheer's tip-jar length depends on how
    many gems the bit amount throws; a sub is its frame-sequence length). The
    stinger project computes the exact same number from the same event, so the two
-   stay in lockstep without messaging each other.
+   stay in lockstep without messaging each other. The stinger comes in two sizes,
+   paired with this chat's: compact (a 400 source) and normal (596, and always with
+   the receipt), whose jar intro and sub stinger run for different lengths.
 
-   IMPORTANT: STINGER_SYNC + stingerContentMs/stingerCheerThrows must stay identical
-   to the copies in the stinger's script.js. If you change these, change both.
+   Stingers queue: one that comes in while another is still coming or on screen
+   waits for it to fade away (stingerSchedule), and the chat stays out — or, with the
+   receipt, its cards stay held — until the last one has cleared.
+
+   IMPORTANT: STINGER_SYNC + stingerContentMs/stingerCheerThrows/stingerSchedule must
+   stay identical to the copies in the stinger's script.js. If you change these, change both.
    ========================================================================= */
 const STINGER_SYNC = {
   chatFadeMs:     350,  // chat fade out / fade in (matches #mainContainer transition in style.css)
   // --- tip-jar timing model, mirrors the stinger's CFG so we can predict a cheer's length ---
   fps:            25,
-  jarIntroFrames: 36,   // the jar-rise intro
+  jarIntroFrames: { compact: 36, normal: 10 },    // compact: the jar falls in; normal: a 400ms fade-in
   throwStaggerMs: 170,  // gap between queued gem throws
   throwFlightMs:  780,  // a gem's flight time
   noteTailMs:     850,  // the last note lingers after the last gem lands
   jarIdleMs:      800,  // the jar/sub holds this long before it starts fading out
   maxThrows:      40,   // the jar clamps a cheer to this many throws
-  subFrames:      65,   // sub-stinger frame count
+  subFrames:      { compact: 65, normal: 147 },   // normal: a 5.88s webm
+  // raid bell: intro frames, then the click loop once per raider (max raidMaxClicks).
+  // compact: the Blender intro; normal: the 400ms fade-in on the resting bell
+  raidIntroFrames: { compact: 35, normal: 10 },
+  raidClickFrames: { compact: 7,  normal: 7 },
+  raidMaxClicks:  10,
+  raidPauseFrames: 8,   // rest between the intro and the first click
+  // donation stinger (paper bag). compact: its frame count; normal: the live bag's 2.4s in 25fps frames
+  donoFrames:     { compact: 53, normal: 60 },
   marginMs:       250,  // small pad so the chat's card lands as the stinger clears, not before
+  fadeOutMs:      400,  // a stinger's own fade out — the next queued one waits for it
 };
+// which stinger this chat is paired with: compact beside a compact chat, normal otherwise
+const stingerSize = () => compact ? 'compact' : 'normal';
 
 // mirrors CFG.bitTiers decomposition in the stinger — how many gems a cheer throws
 function stingerCheerThrows(bits) {
@@ -947,48 +967,75 @@ function stingerContentMs(kind, data) {
   const S = STINGER_SYNC;
   if (kind === 'cheer') {
     const n = stingerCheerThrows(data && data.bits);
-    const introMs  = S.jarIntroFrames / S.fps * 1000;
+    const introMs  = S.jarIntroFrames[stingerSize()] / S.fps * 1000;
     const throwsMs = (n - 1) * S.throwStaggerMs + S.throwFlightMs;
     return Math.round(introMs + throwsMs + S.noteTailMs + S.jarIdleMs + S.marginMs);
   }
-  return Math.round(S.subFrames / S.fps * 1000 + S.jarIdleMs + S.marginMs);
+  if (kind === 'raid') {
+    // bell intro, then one click per raider (1-10 viewers -> that many, more -> max)
+    const clicks = Math.min(S.raidMaxClicks, Math.max(1, Math.floor(data && data.viewers) || 1));
+    const frames = S.raidIntroFrames[stingerSize()] + S.raidPauseFrames + clicks * S.raidClickFrames[stingerSize()];
+    return Math.round(frames / S.fps * 1000 + S.jarIdleMs + S.marginMs);
+  }
+  // donation / tip — the paper bag plays, then holds jarIdleMs, then fades
+  if (kind === 'dono') return Math.round(S.donoFrames[stingerSize()] / S.fps * 1000 + S.jarIdleMs + S.marginMs);
+  return Math.round(S.subFrames[stingerSize()] / S.fps * 1000 + S.jarIdleMs + S.marginMs);
 }
 
-let stingerCycleEndAt = 0;   // performance.now() when the held cards are released
-let stingerPendingCards = []; // card render thunks waiting for the chat to come back
-
-function startStingerCycle(contentMs) {
+// The stinger queue — identical to the stinger's copy. Both sources run it on the same
+// events at the same moment, so they agree on when every stinger plays without talking:
+// a stinger starts once the chat has faded out and the one before it has fully faded
+// away, so they play one after another and never overlap. A sub that lands while a sub
+// stinger is still coming or on screen is part of that burst (a gift bomb) and adds no
+// stinger. Returns { start, contentMs } (performance.now() ms), or null for such a sub.
+let stingerQueueEnd = 0, stingerSubEnd = 0;   // when the last stinger / last sub stinger is gone
+function stingerSchedule(kind, data) {
   const S = STINGER_SYNC, now = performance.now();
-  const hiddenBeforeFadeIn = S.chatFadeMs + contentMs;   // chat hidden until the stinger fades out
-  stingerCycleEndAt = now + hiddenBeforeFadeIn + S.chatFadeMs;
-  mainContainer.classList.add('stinger-hidden');                         // fade chat out
-  setTimeout(() => mainContainer.classList.remove('stinger-hidden'),     // fade chat back in
-             hiddenBeforeFadeIn);
-  setTimeout(() => {                                                     // chat is back -> show held cards
+  if (kind === 'sub' && now < stingerSubEnd) return null;
+  const contentMs = stingerContentMs(kind, data);
+  const start = Math.max(now + S.chatFadeMs, stingerQueueEnd);
+  stingerQueueEnd = start + contentMs - S.marginMs + S.fadeOutMs;
+  if (kind === 'sub') stingerSubEnd = stingerQueueEnd;
+  return { start, contentMs };
+}
+
+let stingerHolding = false;    // cards are held until the queued stingers have played
+let stingerPendingCards = [];  // card render thunks waiting for the chat to come back
+let stingerShowTimer = 0, stingerReleaseTimer = 0;
+
+// A stinger was queued: the chat fades out (if it isn't out already) and stays out until
+// the LAST queued stinger clears, then fades back in and shows the held cards, in order.
+function holdChatFor(slot) {
+  const S = STINGER_SYNC, now = performance.now(), backAt = slot.start + slot.contentMs;
+  stingerHolding = true;
+  if (!receipt) mainContainer.classList.add('stinger-hidden');    // the receipt stays put; only its cards wait
+  clearTimeout(stingerShowTimer); clearTimeout(stingerReleaseTimer);
+  stingerShowTimer = setTimeout(() => mainContainer.classList.remove('stinger-hidden'), backAt - now);
+  stingerReleaseTimer = setTimeout(() => {                         // chat is back -> show held cards
+    stingerHolding = false;
     const cards = stingerPendingCards; stingerPendingCards = [];
     cards.forEach(fn => { try { fn(); } catch (e) { console.error(e); } });
-    if (stingerPendingCards.length && performance.now() >= stingerCycleEndAt) startStingerCycle(stingerContentMs('sub'));
-  }, hiddenBeforeFadeIn + S.chatFadeMs);
+  }, backAt + S.chatFadeMs - now);
 }
 
 // Call on the RAW triggering event (before any gift-bomb accumulation) so the chat
-// fade lines up with the stinger, which fires on the same event. kind is 'cheer' or
-// 'sub'; data carries the bit amount (cheer) and the user (avatar pre-warm). Bursts
-// collapse into the one active cycle. Pre-warming the avatar during the hidden window
-// lets the held card pop in tight to the chat's return instead of waiting on a fetch.
-function stingerTrigger(kind, data) {
+// fade lines up with the stinger, which fires on the same event. kind is 'cheer', 'raid',
+// 'dono' or 'sub'; data carries the bit amount (cheer), viewers (raid) and the user
+// (avatar pre-warm). Pre-warming the avatar while the chat is out lets the held card
+// pop in tight to the chat's return instead of waiting on a fetch.
+function stingerTrigger(kind, data, platform = 'twitch') {
   if (!stingersEnabled) return;
   const user = data && data.user;
-  if (user && user.name) GetAvatar(user.name, user.profileImageUrl, 'twitch');
-  if (performance.now() >= stingerCycleEndAt) startStingerCycle(stingerContentMs(kind, data));
+  if (user && user.name) GetAvatar(user.name, user.profileImageUrl, platform);
+  const slot = stingerSchedule(kind, data);
+  if (slot) holdChatFor(slot);
 }
 
-// Wrap the actual card render. When a cycle is active the card is held until the
-// chat fades back in; otherwise (stingers off, or the rare event that lands after
-// the window) it renders immediately, so behaviour is unchanged when disabled.
+// Wrap the actual card render. While stingers are queued the card is held until the
+// chat fades back in; otherwise (stingers off, or no stinger coming) it renders
+// immediately, so behaviour is unchanged when disabled.
 function stingerGateCard(thunk) {
-  if (!stingersEnabled) return thunk();
-  if (performance.now() < stingerCycleEndAt) stingerPendingCards.push(thunk);
+  if (stingersEnabled && stingerHolding) stingerPendingCards.push(thunk);
   else thunk();
 }
 
@@ -997,7 +1044,8 @@ async function TwitchResub(data) { if (!showTwitchSubs) return; stingerTrigger('
 async function TwitchRaid(data) {
 	if (!showTwitchRaids) return;
 	if (!data.user) data.user = { id: data.from_broadcaster_user_id, name: data.from_broadcaster_user_name, login: data.from_broadcaster_user_login };
-	await renderEventCard(data, 'raid', 'twitch');
+	stingerTrigger('raid', data);   // the raid bell
+	stingerGateCard(() => renderEventCard(data, 'raid', 'twitch'));
 }
 async function TwitchAnnouncement(data) { if (showTwitchAnnouncements) await renderFeaturedMessage(data, "ANNOUNCEMENT", 'twitch'); }
 async function TwitchAutomaticRewardRedemption(data) {
@@ -1185,10 +1233,9 @@ function flushGiftBomb(key) {
 	giftBombBuffer.delete(key);
 	const { data, platform, count } = entry;
 
-	// Only Twitch gifts drive the stinger; other platforms render immediately.
-	const gate = (platform === 'twitch') ? stingerGateCard : (fn => fn());
-	if (count === 1) gate(() => renderEventCard(data, 'gift', platform));
-	else gate(() => renderEventCard({ ...data, giftCount: count, recipient: null, messageId: `giftbomb-${Date.now()}` }, 'giftbomb', platform));
+	// Twitch gift subs and YouTube gifted memberships both play the sub stinger, so both wait for it.
+	if (count === 1) stingerGateCard(() => renderEventCard(data, 'gift', platform));
+	else stingerGateCard(() => renderEventCard({ ...data, giftCount: count, recipient: null, messageId: `giftbomb-${Date.now()}` }, 'giftbomb', platform));
 }
 
 async function TwitchGiftSub(data) { if (!showTwitchSubs) return; stingerTrigger('sub', data); accumulateGift(data, 'twitch'); }
@@ -1280,12 +1327,14 @@ async function YouTubeMessage(data) {
 async function YouTubeSuperChat(data) {
 	if (!showYouTubeSuperChats) return;
 	if (!data.user) data.user = { id: data.eventId || 'yt-user', name: data.user ? data.user.name : 'YouTube Fan' };
-	await renderEventCard(data, 'superchat', 'youtube');
+	stingerTrigger('dono', data, 'youtube');   // the paper-bag donation stinger
+	stingerGateCard(() => renderEventCard(data, 'superchat', 'youtube'));
 }
 // A membership is YouTube's sub; "subscribed" is now the subscriber card below.
 async function YouTubeNewSponsor(data) {
 	if (!showYouTubeMemberships) return;
-	await renderFollowCard(data, 'youtube', 'became a member');
+	stingerTrigger('sub', data, 'youtube');    // the sub stinger
+	stingerGateCard(() => renderFollowCard(data, 'youtube', 'became a member'));
 }
 // YouTube's follow. Streamer.bot gets these through its StreamElements integration,
 // and a test event carries no user, so those are skipped. No setting of its own.
@@ -1295,19 +1344,23 @@ async function YouTubeNewSubscriber(data) {
 }
 async function YouTubeGiftMembershipReceived(data) {
 	if (!showYouTubeMemberships) return;
-	accumulateGift({ ...data, user: data.gifter || data.user, recipient: data.recipient || data.user, subTier: data.tier || '1' }, 'youtube');
+	const gift = { ...data, user: data.gifter || data.user, recipient: data.recipient || data.user, subTier: data.tier || '1' };
+	stingerTrigger('sub', gift, 'youtube');    // the sub stinger, once per batch like Twitch gift subs
+	accumulateGift(gift, 'youtube');
 }
 
 async function StreamlabsDonation(data) {
 	if (!showStreamlabsDonations) return;
 	if (!data.user) data.user = { id: data.from, name: data.from };
-	await renderEventCard(data, 'donation', 'twitch');
+	stingerTrigger('dono', data);   // the paper-bag donation stinger
+	stingerGateCard(() => renderEventCard(data, 'donation', 'twitch'));
 }
 async function StreamElementsTip(data) {
 	if (!showStreamElementsTips) return;
 	if (!data.user) data.user = { id: data.username, name: data.username };
 	if (!data.formattedAmount) data.formattedAmount = `$${data.amount}`;
-	await renderEventCard(data, 'donation', 'twitch');
+	stingerTrigger('dono', data);   // the paper-bag donation stinger
+	stingerGateCard(() => renderEventCard(data, 'donation', 'twitch'));
 }
 
 const Simplex3D = (function () {
